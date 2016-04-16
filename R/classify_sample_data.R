@@ -42,23 +42,26 @@ library(dplyr); library(readr); library(lubridate); library(ggplot2)
 
 ## full weixelman dataset
 dat.wx<-read_csv("./data/base/2016_SN_FS_Plots_HGM.csv") %>% 
-  select(PLOT:source_type, PLOTNAME2:Shape_Area) %>% 
+  select(PLOT:UCDavisObject_ID, elev, ELEV_MEAN, source_type, PLOTNAME2,
+         AREA_ACRE, HUC12, LAT_DD:LONG_DD, Shape_Area) %>% 
   rename(METHOD = METHOD.x)
 names(dat.wx)
 
 ## count how many w/ ELEV_MEAN > 2100
 dim(dat.wx[dat.wx$ELEV_MEAN>2100,]) # 56 meadows
+dim(dat.wx[dat.wx$elev>2100,]) # 56 meadows
 
 ## bin by source_type
 # dat.wx %>% group_by(source_type) %>% summarize(n(),min(ELEV_MEAN), max(ELEV_MEAN))
 
 ## make hgm classes and drop type 8 (DRY)
-dat.wx$hgm_classes<-cut(dat.wx$source_type, breaks = seq(0,7,1), labels = seq(1,7))
+dat.wx$hgm_classes<-cut(dat.wx$source_type, breaks = seq(0,6,1), labels = seq(1,6))
+dat.wx$hgm_classes[dat.wx$source_type==7]<-6
 table(dat.wx$hgm_classes) # view table of classes
 
 ## make elev classes with 2100 as cutoff
-dat.wx$elev_2100<-ifelse(dat.wx$elev<2100, 0,1) # this is weixelman elev
-dat.wx$elev_2100_factor<-ifelse(dat.wx$elev<2100, "<2100",">=2100")
+# dat.wx$elev_2100<-ifelse(dat.wx$elev<2100, 0,1) # this is weixelman elev
+dat.wx$elev_2100_factor<-ifelse(dat.wx$elev<2100, "<2100",">=2100") # this is weixelman elev
 dat.wx$elev_av_2100<-ifelse(dat.wx$ELEV_MEAN<2100, "<2100",">=2100") # this is UCDSNMC elev
 
 table(dat.wx$elev_2100) # 59 less than 2100, 55 >2100
@@ -68,20 +71,20 @@ table(dat.wx$elev_av_2100) # 59 less than 2100, 55 >2100
 ## basic plot
 # plot(dat.wx$elev ~ dat.wx$source_type, col=ifelse(dat.wx$elev>2100, "maroon","forestgreen"))
 
-ggplot()+ geom_bar(data=dat.wx, aes(x=source_type, fill=elev_2100_factor))
+ggplot()+ geom_bar(data=dat.wx, aes(x=hgm_classes, fill=elev_2100_factor))
 
 # SAMPLE ------------------------------------------------------------------
 
 names(dat.wx)
 
 # select cols of interest first: 
-wx.samp<-dat.wx %>% 
-  select(PLOT:UCDavisObject_ID, elev:ELEV_MEAN, LAT_DD:elev_av_2100) %>% 
-  group_by(source_type, elev_av_2100) %>% 
-  sample_n(size = 2, replace=TRUE)
+wx.samp<-dat.wx %>%  
+  group_by(hgm_classes, elev_av_2100) %>% 
+  sample_n(size = 2, replace=F)
 
 glimpse(wx.samp)
 h(as.data.frame(wx.samp))
 
+ggplot()+ geom_bar(data=wx.samp, aes(x=hgm_classes, fill=elev_av_2100))
 
-ggplot()+ geom_bar(data=wx.samp, aes(x=source_type, fill=elev_av_2100))
+Nice and balanced!
