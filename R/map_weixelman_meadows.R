@@ -11,14 +11,11 @@ library(dplyr); library(readr); library(lubridate)
 dat<-read_csv("./data/base/2016 Sierra Nevada FS plots March 29 2016.csv")
 str(dat)
 
-load("./data/base/mdw_geedat2.rda")  # mdws: full google earth dataset (1424 mdws)
-#str(mdws)
+## Full Weixelman dataset
+dat2<-read_csv("./data/base/2016 Sierra Nevada FS plots with HGM.csv")
+str(dat2)
 
-# need to extract the XY for meadows to plot:
-mdws_xy<- mdws %>% distinct(ID) %>%
-  #filter(!is.na(lat)) %>%
-  as.data.frame()
-dim(mdws_xy)
+# load("./data/base/mdw_geedat2.rda")  # mdws: full google earth dataset (1424 mdws)
 
 # Projection
 WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84"
@@ -57,6 +54,32 @@ points(wx.mdw$LONG_DD, wx.mdw$LAT_DD, pch=16, col="yellow")
 library(ggplot2)
 ggplot(data=wx.mdw)+ geom_histogram(aes(AREA_ACRE*0.404686), bins = 25)+
   xlim(c(0,25))+xlab("Hectares (threshold for GE >1.4 hec)")
+
+
+# CUT AND CLASSIFY DATA ---------------------------------------------------
+
+# merge with XY data
+dat3<-left_join(dat2, wx.mdw, by=c("PLOT"="PLOT"))
+dat.wx<-select(dat3, PLOT:source_type, ELEV_MEAN, LAT_DD, LONG_DD)
+h(dat.wx)
+
+# count how many w/ ELEV_MEAN > 2100
+dim(dat.wx[dat.wx$ELEV_MEAN>2100,]) # 56 meadows
+
+# bin by source_type
+#dat.wx %>% group_by(source_type) %>% summarize(n(),min(ELEV_MEAN), max(ELEV_MEAN))
+
+dat.wx$hgm_classes<-cut(dat.wx$source_type, breaks = seq(0,7,1), labels = seq(1,7))
+table(dat.wx$hgm_classes)
+(as.data.frame(dat.wx))
+
+dat.wx$elev_2100<-ifelse(dat.wx$elev<2100, 0,1)# "<2100","+2100")
+
+plot(dat.wx$elev ~ dat.wx$source_type, col=ifelse(dat.wx$elev>2100, "maroon","forestgreen"))
+
+library(ggplot2)
+ggplot()+ geom_histogram(data=dat.wx, aes(x=source_type, group=elev), fill="maroon")
+
 
 # MAKE A SHINY MAP --------------------------------------------------------
 
