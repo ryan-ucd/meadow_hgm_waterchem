@@ -86,5 +86,3 @@ glimpse(wx.samp)
 h(as.data.frame(wx.samp))
 
 ggplot()+ geom_bar(data=wx.samp, aes(x=hgm_classes, fill=elev_av_2100))
-
-Nice and balanced!

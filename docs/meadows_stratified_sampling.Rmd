@@ -1,0 +1,103 @@
+---
+title: "classify & Sample Meadows for Sourcewater Study"
+author: "Ryan Peek"
+date: "April 18, 2016"
+output: html_document
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Objective
+
+> - **Determine sourcewater relationship with HGM type and NDVI-NDWI**
+
+> - **Create/frame metrics that are quantifiable and stand alone**
+
+> - **Tie this to prioritization for restoration**
+ - Vulnerable vs. Resilient
+   - **VULNERABLE**: Incision, land use, climate
+   - **RESILIENT**: Sourcewater, more groundwater driven is more resilient, more surfacewater is less resilient
+
+## Steps
+ - Pick 20-25 Meadows
+ - Conduct on the ground/remote HGM typing to get overall HGM proportions for meadows
+ - WQ sampling: minimum of 2 WQ sample times per meadow, (early summer/fall)
+ - Multilevel-bayesian mixed modeling 
+
+### Classification/Selection
+
+Classify 120 by these factors and randomly pick from these, minimum of X for each type?
+
+- HGM type (3 of each type, 7 types, exclude DRY)
+- Elevation (>2000-2100: Snowline, or treeline)
+
+Randomly select from these 14 bins, if holes talk with Dave and add meadows. NFWF meadows to this? Van Norden as well. Might need fewer meadows from Dave's set if we can fill bins with NFWF/Van Norden
+
+- Latitude (Modoc/Lassen, Plumas/Tahoe/ED, Southern Central Sierra (Stan/Seq/Sierra/Inyo))
+
+
+### Classifying & Binning Meadows
+
+So first, a quick overview of the data. Across the **8** **HGM Source Types**, several types only have 2 meadows (type 6 and 8). Furthermore, those all fall into the same elevation bin (nothing above 2000 m in class 7 and 8). See below. If we want to select 3 per type, we'd need more meadows just to meet the minimum, and that would require selecting all available regardless. 
+
+```{r plotsummary, message=F, echo=FALSE}
+
+library(dplyr); library(readr); library(lubridate); library(ggplot2)
+
+## full weixelman dataset
+dat.wx<-read_csv(".././data/base/2016_SN_FS_Plots_HGM.csv") %>% 
+  select(PLOT:UCDavisObject_ID, elev, ELEV_MEAN, source_type, PLOTNAME2,
+         AREA_ACRE, HUC12, LAT_DD:LONG_DD, Shape_Area) %>% 
+  rename(METHOD = METHOD.x)
+
+## count how many w/ ELEV_MEAN > 2100 using the UCDSNMC elevations
+#dim(dat.wx[dat.wx$ELEV_MEAN>2100,]) # 56 meadows
+
+## bin by source_type across ALL TYPES
+DT::datatable(as.data.frame(dat.wx %>% group_by(source_type) %>% summarize(n(),mean(ELEV_MEAN), max(ELEV_MEAN))))
+#knitr::kable(as.data.frame(dat.wx %>% group_by(source_type) %>% summarize(n(),mean(ELEV_MEAN), max(ELEV_MEAN)))) # for word
+
+```
+
+It may make more sense to pick 2 per class/hgm type. If we drop HGM source_type 8 *(Dry)*, and combine classes 6 and 7, that leaves at least 2 meadows of each type and elevation class within each bin.
+
+```{r binned, echo=FALSE}
+
+# Bin by type and elevation.
+## make hgm classes and drop type 8 (DRY)
+dat.wx$hgm_classes<-cut(dat.wx$source_type, breaks = seq(0,6,1), labels = seq(1,6))
+dat.wx$hgm_classes[dat.wx$source_type==7]<-6
+#knitr::kable(as.data.frame(table(dat.wx$hgm_classes))) # view table of classes
+
+## make elev classes with 2100m as cutoff
+dat.wx$elev_av_2100<-ifelse(dat.wx$ELEV_MEAN<2100, "<2100",">=2100") # this is UCDSNMC elev
+# table(dat.wx$elev_av_2100) # 59 less than 2100, 55 >2100
+
+ggplot()+ geom_bar(data=dat.wx[is.na(dat.wx$hgm_classes)==F,], aes(x=hgm_classes, fill=elev_av_2100))
+
+```
+
+Assuming we select 2 meadows per bin to start, the easiest approach to randomly sample (from an already small sample), is to use the *`sample`* function in R, after grouping by *hgm class* & *elevation*.
+
+```{r randomsample, echo=F, message=F}
+
+library(DT)
+
+# select cols of interest first: 
+wx.samp<-dat.wx %>%  
+  group_by(hgm_classes, elev_av_2100) %>% 
+  sample_n(size = 2, replace=F)
+
+DT::datatable(as.data.frame(wx.samp))
+#knitr::kable(as.data.frame(wx.samp))
+
+ggplot()+ geom_bar(data=wx.samp[is.na(wx.samp$hgm_classes)==F,], aes(x=hgm_classes, fill=elev_av_2100))+ggtitle("Balanced Stratified Random Meadow Selection \n (2 per bin, no replacement)")
+
+
+```
+
+
+Haven't dealt with selecting across latitude yet, but I'll get a map into this sometime soon.
