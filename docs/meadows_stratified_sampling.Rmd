@@ -1,5 +1,5 @@
 ---
-title: "classify & Sample Meadows for Sourcewater Study"
+title: "Classify & Sample Meadows for Sourcewater Study"
 author: "Ryan Peek"
 date: "April 18, 2016"
 output: html_document
@@ -99,5 +99,5 @@ ggplot()+ geom_bar(data=wx.samp[is.na(wx.samp$hgm_classes)==F,], aes(x=hgm_class
 
 ```
 
-
 Haven't dealt with selecting across latitude yet, but I'll get a map into this sometime soon.
+
