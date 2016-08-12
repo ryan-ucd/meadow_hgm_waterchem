@@ -1,0 +1,141 @@
+---
+title: "Set Up Modeling"
+author: "Ryan Peek"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+ html_document:
+   highlight: pygments
+   theme: yeti
+---
+
+# Model Meadow vs. HGM vs. LANDSAT 
+
+## Get Data and Clean
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libs, echo=FALSE}
+suppressPackageStartupMessages({
+  library(dplyr)
+	library(ggplot2)
+	library(lubridate)
+	library(leaflet)
+  library(readr)
+  library(quickmapr)
+  })
+```
+
+```{r load-data, echo=FALSE}
+
+wx.mdw<-read_rds("data/wx_mdw_dat.rds")
+mdw.df<-read_rds("data/UCD_mdw_df.rds")
+
+```
+
+## Make a Shiny Map
+
+```{r leaflet-mdws}
+library(leaflet)
+
+m <- leaflet() %>% addTiles() %>% 
+  #setView(lng = -120.8, lat = 39, zoom = 8) %>%  # set to Auburn/Colfax, zoom 5 for CA 
+  addTiles(group = "OSM") %>%
+  addProviderTiles("Stamen.TopOSMFeatures", group = "OSM Features") %>%
+  addProviderTiles("Esri.WorldImagery", group = "ESRI Aerial") %>%
+  addProviderTiles("Thunderforest.Landscape", group = "Topo") %>%
+  hideGroup("OSM Features") %>% 
+  
+
+# proposed sites
+addCircleMarkers(data=wx.mdw, group="Weixelman Sites",
+                 lng= ~LONG_DD, lat= ~LAT_DD,
+                 popup=paste0("Plot: ", wx.mdw$PLOT, "<br>", "Name: ", 
+                              wx.mdw$PLOTNAME2, "<br>", "UCD_ID: ",
+                              wx.mdw$UCDavis_Object_ID, "<br>", "Area_acres: ",
+                              wx.mdw$AREA_ACRE, "<br>", "HUC12: ",
+                              wx.mdw$HUC12, "<br>", "Elev_mean_m: ",
+                              wx.mdw$ELEV_MEAN),
+                 stroke=TRUE, weight=0.6,radius=10,
+                 fillOpacity = 0.8, color="black",
+                 fillColor = "yellow") %>%
+  
+
+  # all mdws
+  addCircleMarkers(data=mdw.df, group="UCD Mdws",
+                   lng= ~LONG_DD, lat= ~LAT_DD,
+                   popup=paste0("UCD_ID: ", mdw.df$ID, "<br>", "Area_acres: ",
+                                mdw.df$AREA_ACRE, "<br>", "HUC12: ",
+                                mdw.df$HUC12, "<br>", "Ownership: ",
+                                mdw.df$OWNERSHIP, "<br>", "Elev_mean_m: ",
+                                mdw.df$ELEV_MEAN),
+                   radius = 3,
+                   #radius = ~ifelse(mdw.df$ELEV_MEAN>=2000, 3, 5),
+                   fillColor= ~ifelse(mdw.df$ELEV_MEAN>=2000, "maroon", "darkgreen"),
+                   stroke=TRUE, weight=0.6, fillOpacity= 0.8, color="black") %>%
+  hideGroup("UCD Mdws") %>%
+  
+  # add a legend for all mdw points
+  addLegend("bottomright", colors = c("maroon", "darkgreen"),
+            labels=c(">=2000 m", "<2000 m"),
+            title = "Mdw Elev Mean:",
+            opacity = 0.7) %>% 
+
+  # add controls for basemaps and data
+  addLayersControl(
+    baseGroups = c("OSM", "ESRI Aerial", "Topo"),
+    overlayGroups = c("Weixelman Sites","UCD Mdws",
+                      "OSM Features"),
+    options = layersControlOptions(collapsed = T))
+
+  # Print Map
+m
+
+```
+
+
+```{r subset-polygonmdws}
+
+library(rgdal)
+WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84" # Projection
+# mdw.sp<- readOGR("./data/base/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.shp", layer="Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m", verbose = F)
+# mdw.sp<-spTransform(mdw.sp, CRS(WGS84))
+# str(mdw.sp@data)
+# mdw.df<-as.data.frame(mdw.sp)
+# plot(mdw.df$LONG_DD, mdw.df$LAT_DD, pch=21, bg="forestgreen", cex=1.2)
+
+wxmdw_list<-as.factor(wx.mdw$UCDavis_Object_ID) # LIST OF WX MDWS
+
+# Subset the full dataset extracting only the desired attributes
+mdw.wx.sp <- subset(mdw.sp, ID %in% wxmdw_list)
+mdw.wx.sp <- spTransform(mdw.wx.sp, CRS(WGS84)) # add projection
+
+# Subset to Van Norden & Childs [VN==UCDSNM014503 & Childs==UCDSNM015788]
+mdw.sub.sp <- subset(mdw.sp, ID=="UCDSNM014503" | ID=="UCDSNM015788")
+
+# make a leaflet map
+m2 <- leaflet() %>% addTiles() %>% 
+  #setView(lng = -120.8, lat = 39, zoom = 8) %>%  # set to Auburn/Colfax, zoom 5 for CA 
+  addTiles(group = "OSM") %>%
+  addProviderTiles("Esri.WorldImagery", group = "ESRI Aerial") %>%
+  addProviderTiles("Thunderforest.Landscape", group = "Topo") %>% 
+  
+  # proposed sites
+  addPolygons(data=mdw.sub.sp, group="Mdws", weight = 3,
+              fillColor = "yellow", color="orange", fillOpacity = 0.6, 
+              popup=paste0("MDW_ID: ", mdw.sub.sp@data$ID, "<br>", "Elev_Mean (m): ",
+                           mdw.sub.sp@data$ELEV_MEAN)) %>%
+  # add controls for basemaps and data
+  addLayersControl(
+    baseGroups = c("OSM", "ESRI Aerial", "Topo"),
+    overlayGroups = c("Mdws"),
+    options = layersControlOptions(collapsed = T))
+
+# Print Map
+m2
+
+
+
+```
+
