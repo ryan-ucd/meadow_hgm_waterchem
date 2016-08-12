@@ -1,7 +1,6 @@
 ---
 title: "Classify & Sample Meadows for Sourcewater Study"
-author: "Ryan Peek"
-date: "April 18, 2016"
+date: "Updated `r format(Sys.time(), '%Y-%m-%d')`"
 output: html_document
 always_allow_html: yes
 ---
@@ -10,33 +9,48 @@ always_allow_html: yes
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Objective
+## Objectives
 
-> - **Determine sourcewater relationship with HGM type and NDVI-NDWI**
-
-> - **Create/frame metrics that are quantifiable and stand alone**
-
-> - **Tie this to prioritization for restoration**
- - Vulnerable vs. Resilient
-   - **VULNERABLE**: Incision, land use, climate
-   - **RESILIENT**: Sourcewater, more groundwater driven is more resilient, more surfacewater is less resilient
+ - *Determine sourcewater relationship with HGM type and NDVI-NDWI*
+ - *Create/frame metrics that are quantifiable and stand alone*
+ - *Tie this to prioritization for restoration*
+ - **Vulnerable vs. Resilient**:
+    - **VULNERABLE**: Incision, land use, climate
+    - **RESILIENT**: Sourcewater, more groundwater driven is more resilient, more surfacewater is less resilient  
 
 ## Steps
- - Pick 20-25 Meadows
- - Conduct on the ground/remote HGM typing to get overall HGM proportions for meadows
- - WQ sampling: minimum of 2 WQ sample times per meadow, (early summer/fall)
- - Multilevel-bayesian mixed modeling 
+ 1. Pick 20-25 Meadows
+ 2. Conduct on the ground/remote HGM typing to get overall HGM proportions for meadows
+ 3. WQ sampling: minimum of 2 WQ sample times per meadow, (early summer/fall)
+ 4. Multilevel-bayesian mixed modeling 
 
 ### Classification/Selection
 
 Classify 120 by these factors and randomly pick from these, minimum of X for each type?
 
-- HGM type (3 of each type, 7 types, exclude DRY)
-- Elevation (>2000-2100: Snowline, or treeline)
+- *HGM Type* (pick 3 mdws of each HGM type, 7 types, exclude *DRY*)
+- *Elevation Class* (>2000-2100: Snowline, or treeline, and <=2000)
 
 Randomly select from these 14 bins, if holes talk with Dave and add meadows. NFWF meadows to this? Van Norden as well. Might need fewer meadows from Dave's set if we can fill bins with NFWF/Van Norden
 
 - Latitude (Modoc/Lassen, Plumas/Tahoe/ED, Southern Central Sierra (Stan/Seq/Sierra/Inyo))
+
+### HGM Types
+
+```{r hgms, message=F, echo=F}
+
+# df of meadow source types:
+mdw_types<-c("lacustrine fringe", "depressional", "discharge-slope-hillslope",
+             "riparian-discharge-slope", "riparian", "subsurface-discharge-slope",
+             "subsurface", "dry")
+mdw_type_code<-c("lf", "dep", "ds", "rip-ds", "rip", "sub-ds", "sub", "dry")
+mdw_type_class<-seq(1,8,1)
+# bind df
+mdw_hgms<-data.frame("hgm_type"=mdw_types,"hgm_code"=mdw_type_code, "hgm_class"=mdw_type_class )
+DT::datatable(mdw_hgms)
+
+```
+
 
 
 ### Classifying & Binning Meadows
@@ -48,16 +62,15 @@ So first, a quick overview of the data. Across the **8** **HGM Source Types**, s
 library(dplyr); library(readr); library(lubridate); library(ggplot2)
 
 ## full weixelman dataset
-dat.wx<-read_csv(".././data/base/2016_SN_FS_Plots_HGM.csv") %>% 
-  select(PLOT:UCDavisObject_ID, elev, ELEV_MEAN, source_type, PLOTNAME2,
-         AREA_ACRE, HUC12, LAT_DD:LONG_DD, Shape_Area) %>% 
-  rename(METHOD = METHOD.x)
+dat.wx<-read_csv(".././data/2016_FS_Plots_HGM_w_UCDSNMC.csv") %>% 
+  select(PLOT:UCDavisObject_ID, elev, ELEV_MEAN, hgm_class, PLOTNAME2,
+         AREA_ACRE, LAT_DD:LONG_DD, Shape_Area)
 
 ## count how many w/ ELEV_MEAN > 2100 using the UCDSNMC elevations
 #dim(dat.wx[dat.wx$ELEV_MEAN>2100,]) # 56 meadows
 
 ## bin by source_type across ALL TYPES
-DT::datatable(as.data.frame(dat.wx %>% group_by(source_type) %>% summarize(n(),mean(ELEV_MEAN), max(ELEV_MEAN))))
+DT::datatable(as.data.frame(dat.wx %>% group_by(hgm_class) %>% summarize(n(),mean(ELEV_MEAN), max(ELEV_MEAN))))
 #knitr::kable(as.data.frame(dat.wx %>% group_by(source_type) %>% summarize(n(),mean(ELEV_MEAN), max(ELEV_MEAN)))) # for word
 
 ```
@@ -68,7 +81,7 @@ It may make more sense to pick 2 per class/hgm type. If we drop HGM source_type 
 
 # Bin by type and elevation.
 ## make hgm classes and drop type 8 (DRY)
-dat.wx$hgm_classes<-cut(dat.wx$source_type, breaks = seq(0,6,1), labels = seq(1,6))
+dat.wx$hgm_classes<-cut(dat.wx$hgm_class, breaks = seq(0,6,1), labels = seq(1,6))
 dat.wx$hgm_classes[dat.wx$source_type==7]<-6
 #knitr::kable(as.data.frame(table(dat.wx$hgm_classes))) # view table of classes
 

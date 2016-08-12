@@ -3,8 +3,8 @@
 #'date: "`r format(Sys.time(), '%Y-%m-%d')`"
 #'output:
 #'  html_document:
-#'    theme: flatly
-#'    highlight: pygment
+#'    theme: yeti
+#'    highlight: pygments
 #'--- 
 #'
 #' # Using Spin with R instead of Rmd
@@ -27,7 +27,7 @@
 #' First step is to load libraries and data required for analysis.
 #+ load-libs, include=TRUE
 suppressPackageStartupMessages({
-  library(plyr)
+#  library(plyr)
   library(dplyr)
 	library(ggplot2)
 	library(lubridate)
@@ -75,7 +75,7 @@ saveRDS(comb, file="data/UCD_mdws_SNMMPC.rds")
 
 #+ plot-ndvi-varability, include=TRUE, eval=TRUE, echo=FALSE
 
-mdws<-readRDS("data/UCD_mdws_SNMMPC.rds")
+mdws<-readRDS("data_output/UCD_mdws_SNMMPC.rds")
 source("scripts/multiplot.R")
 
 y1 <- 2011
@@ -89,7 +89,7 @@ p2011<- ggplot(data=single_y1, aes(x=DOWY, y=mean)) +
   geom_point(color="blue2") + # add points
 	scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + ylab("NDVI") + xlab("Day of Water Year") +
-	ggtitle("NDVI standard deviation within Van Norden Meadow for 2011")
+	ggtitle("NDVI with SD within Van Norden Meadow for 2011")
 
 year <- 2014
 single_y2 <- mdws[mdws$WY==year & mdws$ID==mdwID & mdws$index=="NDVI",]
@@ -100,9 +100,12 @@ p2014<-ggplot(data=single_y2, aes(x=DOWY, y=mean)) +
   scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + # set to bw theme
 	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
-	ggtitle("NDVI standard deviation within Van Norden Meadow for 2014")  # title of graph
+	ggtitle("NDVI with SD within Van Norden Meadow for 2014")  # title of graph
 
-multiplot(p2011, p2014)
+multiplot(p2011, p2014) 
+
+#ggsave(multiplot(p2011, p2014), filename = "fig_output/VN_2011-2014_NDVI.svg",
+#       width = 9, height = 6, units = "in", dpi = 200) # make sure 'svglite' installed
 
 #' NDVI is vegetation greeness, so differences are more pronounced during the growing
 #' season. In 2011, there was more snow, which remained on the meadow longer and the
@@ -112,7 +115,7 @@ multiplot(p2011, p2014)
 
 #+ plot-ndwi-varability, include=TRUE, eval=TRUE, echo=FALSE
 
-mdws<-readRDS("data/UCD_mdws_SNMMPC.rds")
+mdws<-readRDS("data_output/UCD_mdws_SNMMPC.rds")
 source("scripts/multiplot.R")
 
 y1 <- 2011
