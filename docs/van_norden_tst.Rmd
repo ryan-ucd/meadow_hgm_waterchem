@@ -2,9 +2,10 @@
 author: "Ryab"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
- html_document:
-   theme: yeti
-   highlight: pygments
+  html_document:
+    highlight: pygments
+    theme: yeti
+always_allow_html: yes
 --- 
 
 # Using Spin with R instead of Rmd
@@ -76,8 +77,8 @@ Take the Van Norden Meadow and calculate DOWY variance and plot.
 
 ```{r plot-ndvi-varability, include=TRUE, eval=TRUE, echo=FALSE}
 
-mdws<-readRDS("data_output/UCD_mdws_SNMMPC.rds")
-source("scripts/multiplot.R")
+mdws<-readRDS("../data_output/UCD_mdws_SNMMPC.rds")
+source("../scripts/multiplot.R")
 
 y1 <- 2011
 meadow <- 'Van Norden'
@@ -117,8 +118,8 @@ an earlier start to vegetation growth in the meadow.
 
 ```{r plot-ndwi-varability, include=TRUE, eval=TRUE, echo=FALSE}
 
-mdws<-readRDS("data_output/UCD_mdws_SNMMPC.rds")
-source("scripts/multiplot.R")
+mdws<-readRDS("../data_output/UCD_mdws_SNMMPC.rds")
+source("../scripts/multiplot.R")
 
 y1 <- 2011
 meadow <- 'Van Norden'
