@@ -1,5 +1,5 @@
 # data clean up from GEE export script (https://ee-api.appspot.com/4516f8d865d540625e7581b28c8e79f5)
-# data represents landsat NDWI values for a selected meadow. Data includes mean, meadian, variance, and standard deviation. 
+# data represents landsat NDWI values for a selected meadow. Data includes mean, median, variance, and standard deviation. 
 
 require(plyr)
 require(stringr)
@@ -30,21 +30,21 @@ tidy_df <- function(messy_data, meadow_name){
 
 ########################################################
 # batch all meadows
-folder='raw/NDWI8DAY/'
-get_csv <- list.files(folder, pattern = "*.csv")
-
-meadows <- c()
-NDWI8DAY <- data.frame()
-
-for(i in 1:length(get_csv)) {
-  name <- strsplit(get_csv[i], "_")[[1]][1]
-  print(name)
-  meadows <- append(meadows, name)
-  csv<-read.csv(paste(folder,get_csv[i], sep=""), colClasses = "character")
-  meadow<-tidy_df(csv, name)
-  NDWI8DAY<-rbind(NDWI8DAY, meadow)
-  rm(csv, meadow, name)
-  }
-     
-  
+# folder='raw/NDWI8DAY/'
+# get_csv <- list.files(folder, pattern = "*.csv")
+# 
+# meadows <- c()
+# NDWI8DAY <- data.frame()
+# 
+# for(i in 1:length(get_csv)) {
+#   name <- strsplit(get_csv[i], "_")[[1]][1]
+#   print(name)
+#   meadows <- append(meadows, name)
+#   csv<-read.csv(paste(folder,get_csv[i], sep=""), colClasses = "character")
+#   meadow<-tidy_df(csv, name)
+#   NDWI8DAY<-rbind(NDWI8DAY, meadow)
+#   rm(csv, meadow, name)
+#   }
+#      
+#   
      

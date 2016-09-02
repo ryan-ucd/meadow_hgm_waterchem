@@ -75,7 +75,7 @@ saveRDS(comb, file="data/UCD_mdws_SNMMPC.rds")
 ## Load Data and Plot
 Take the Van Norden Meadow and calculate DOWY variance and plot.
 
-```{r plot-ndvi-varability, include=TRUE, eval=TRUE, echo=FALSE}
+```{r plot-ndvi-variability, include=TRUE, eval=TRUE, echo=FALSE}
 
 mdws<-readRDS("../data_output/UCD_mdws_SNMMPC.rds")
 source("../scripts/multiplot.R")

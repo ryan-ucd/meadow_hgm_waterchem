@@ -29,8 +29,8 @@ suppressPackageStartupMessages({
 
 ```{r load-data, echo=FALSE}
 
-wx.mdw<-read_rds("data/wx_mdw_dat.rds")
-mdw.df<-read_rds("data/UCD_mdw_df.rds")
+wx.mdw<-read_rds("./data_output/wx_mdw_dat.rds")
+mdw.df<-read_rds("./data_output/UCD_mdw_df.rds")
 
 ```
 

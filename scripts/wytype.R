@@ -10,7 +10,7 @@
 #D       Dry year type
 #C       Critical year type
 
-wy <- read.csv("raw/wy_type.csv")
+wy <- read.csv("./data/wy_type.csv")
 
 # add water year as column to df choose either SAC or SJ as region
 add_wy_type<-function(df, wy_df, region){
@@ -24,7 +24,7 @@ add_wy_type<-function(df, wy_df, region){
 
 # need to separate SAC and SJ WY regions 
 SJ <- c("BullCreek", "Shorthair", "HerringCreek")
-SAC <- c("VanNorden", "Carter", "Childs", "Cow")
+SAC <- c("van_norden", "Carter", "Childs", "Cow")
 
 
 NDWI8DAY_SJ <- NDWI8DAY[NDWI8DAY$meadow %in% SJ,]
