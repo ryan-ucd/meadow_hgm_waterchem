@@ -1,5 +1,5 @@
 ---
-title: "model Van Norden"
+title: "Modeling Sourcewater: Van Norden"
 author: "Ryan Peek"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -12,15 +12,13 @@ always_allow_html: yes
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+# Modeling Sourcewater
 
-The goal of the modeling is to identify relationships between water source 
-(i.e., whether the meadow region in question is driven primarily *snow* or 
-*groundwater*) and underlying hydrology/geomorphology. To identify potential
-links, we will assess the strength of patterns associated with hydrogeomorphic
-types (**HGM**), and water chemistry in conjunction with remote sensing data
+The goal is to identify relationships between water source 
+(i.e., whether the meadow in question in question is driven primarily *snow* or *groundwater*) and underlying hydrology/geomorphology. To identify potential links, we will assess patterns between hydrogeomorphic types (**HGM**), water chemistry, and remote sensing data
 from Google Earth Engine (NDVI and NDWI).
 
-## Pilot Meadow: Van Norden
+# Pilot Meadow: Van Norden
 
 Van Norden is a large meadow at approximately 7,000 ft. 
 
@@ -29,21 +27,154 @@ First step is to load libraries and data required for analysis.
 
 ```{r load-libs, include=TRUE}
 suppressPackageStartupMessages({
-#  library(plyr)
+  library(plyr)
   library(dplyr)
 	library(ggplot2)
 	library(lubridate)
 	library(leaflet)
   library(readr)
+  library(viridis)
   })
 ```
 
 ```{r load-data}
-
+# read in GEE data
+vn.wi<-read_csv("./data/mdws/mdws_batch_NDWI_VanNorden.csv")
 vn.vi<-read_csv("./data/mdws/mdws_batch_NDVI_VanNorden.csv")
-dim(vn.vi)
-head(vn.vi)
 
+source(file='scripts/functions/gee_data_cleanup.R')
+ndwi_df <- gee_tidy_df(vn.wi) # clean up df
+ndvi_df <- gee_tidy_df(vn.vi)
+vn.dat<-bind_rows(ndwi_df,ndvi_df) # bind both df together
+# rm(vn.wi, vn.vi, ndvi_df, ndwi_df) # remove temporary data
+
+source("./scripts/functions/doy.R")
+head(vn.dat)
+vn.dat$date<-ymd(vn.dat$date)
+vn.dat$WY<-wtr_yr(vn.dat$date)
+vn.dat$DOWY<-dowy(vn.dat$date)
+vn.dat$DOY<-yday(vn.dat$date)
+#saveRDS(vn.dat, file="data_output/VanNorden_GEE.rds") # save data 
+
+# read in shape data
+library(foreign)
+mdw_dbf <- read.dbf("data/shps/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.dbf")
+
+# filter to Van Norden
+meadow <- 'Van Norden'
+mdwID <- 'UCDSNM014503'
+mdw_vn <- mdw_dbf %>% filter(ID == mdwID)
 
 ```
 
+### Variability During Drought Years
+
+Plots of 3 years of data, 2011 was a wet year, followed by drought. Notice the pattern of lower peaks and an earlier maximum, particularly noticeable in the NDWI data.
+
+```{r plot-ndvi-variability, include=TRUE, eval=TRUE, echo=FALSE}
+
+source("./scripts/multiplot.R")
+
+y1 <- 2011
+meadow <- 'Van Norden'
+mdwID <- 'UCDSNM014503'
+
+single_y1 <- vn.dat[vn.dat$WY==y1 & vn.dat$ID==mdwID & vn.dat$index=="NDVI",]
+
+p1<- ggplot(data=single_y1, aes(x=DOWY, y=mean)) + 
+	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, color="gray30", alpha=0.5) +
+  geom_point(color="blue2") + # add points
+  stat_smooth(color="blue3", alpha=0.8)+
+	scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
+	theme_bw() + ylab("NDVI") + xlab("Day of Water Year") +
+	ggtitle(paste0("NDVI with SD within Van Norden Meadow for ", y1))
+
+y2 <- 2013
+single_y2 <- vn.dat[vn.dat$WY==y2 & vn.dat$ID==mdwID & vn.dat$index=="NDVI",]
+
+p2<-ggplot(data=single_y2, aes(x=DOWY, y=mean)) + 
+	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
+  geom_point(color="maroon")+ # add points
+  scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
+	theme_bw() + # set to bw theme
+  stat_smooth(color="maroon", alpha=0.5)+
+	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
+	ggtitle(paste0("NDVI with SD within Van Norden Meadow for ", y2))  # title of graph
+
+
+y3 <- 2015
+single_y3 <- vn.dat[vn.dat$WY==y3 & vn.dat$ID==mdwID & vn.dat$index=="NDVI",]
+
+p3<-ggplot(data=single_y3, aes(x=DOWY, y=mean)) + 
+	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
+  geom_point(color="maroon")+ # add points
+  scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
+	theme_bw() + # set to bw theme
+  stat_smooth(color="maroon", alpha=0.5)+
+	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
+	ggtitle(paste0("NDVI with SD within Van Norden Meadow for ", y3))  #
+
+multiplot(p1, p2, p3) 
+
+#ggsave(multiplot(p2011, p2014), filename = "fig_output/VN_2011-2014_NDVI.svg",
+#       width = 9, height = 6, units = "in", dpi = 200) # make sure 'svglite' installed
+```
+
+NDVI is vegetation greeness, so differences are more pronounced during the growing season. In 2011, there was more snow, which remained on the meadow longer and the growing season started later, so values are actually lower earlier in the year. In 2014 the opposite was true, due to a very dry water year which actually permitted an earlier start to vegetation growth in the meadow.
+
+```{r plot-ndwi-varability, include=TRUE, eval=TRUE, echo=FALSE}
+
+source("./scripts/multiplot.R")
+
+y1 <- 2011
+meadow <- 'Van Norden'
+mdwID <- 'UCDSNM014503'
+
+single_y1 <- vn.dat[vn.dat$WY==y1 & vn.dat$ID==mdwID & vn.dat$index=="NDWI",]
+
+p1<- ggplot(data=single_y1, aes(x=DOWY, y=mean)) + 
+	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, color="gray30", alpha=0.5) +
+  geom_point(color="blue2") + # add points
+  stat_smooth(color="blue3", alpha=0.2)+
+	scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
+	theme_bw() + ylab("NDWI") + xlab("Day of Water Year") +
+	ggtitle(paste0("NDWI with SD within Van Norden Meadow for ", y1))
+
+y2 <- 2013
+single_y2 <- vn.dat[vn.dat$WY==y2 & vn.dat$ID==mdwID & vn.dat$index=="NDWI",]
+
+p2<-ggplot(data=single_y2, aes(x=DOWY, y=mean)) + 
+	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
+  geom_point(color="maroon")+ # add points
+  scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
+	theme_bw() + # set to bw theme
+  stat_smooth(color="maroon", alpha=0.2)+
+	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
+	ggtitle(paste0("NDWI with SD within Van Norden Meadow for ", y2))  # title of graph
+
+
+y3 <- 2015
+single_y3 <- vn.dat[vn.dat$WY==y3 & vn.dat$ID==mdwID & vn.dat$index=="NDWI",]
+
+p3<-ggplot(data=single_y3, aes(x=DOWY, y=mean)) + 
+	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
+  geom_point(color="maroon")+ # add points
+  scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
+	theme_bw() + # set to bw theme
+  stat_smooth(color="maroon", alpha=0.2)+
+	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
+	ggtitle(paste0("NDWI with SD within Van Norden Meadow for ", y3))  #
+
+multiplot(p1, p2, p3) 
+
+```
+
+Now the plot should show some differences between NDVI in a wet year and a dry year
+in Van Norden Meadow. What we need to do next is parse this out into proportion 
+of HGM types, and build a model which will give us a distribution of probabilities 
+associated with a given HGM type vs. NDVI or NDWI, during a given growing season.
+
+
+## Time for a Model
+
+Use multilevel but use year as a inflation stat/metric?

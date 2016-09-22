@@ -152,14 +152,6 @@ Now the plot should show some differences between NDVI in a wet year and a dry y
 in Van Norden Meadow. What we need to do next is parse this out into proportion 
 of HGM types, and build a model which will give us a distribution of probabilities 
 associated with a given HGM type vs. NDVI or NDWI, during a given growing season.
-Clear as the Little Colorado, I know.
-
-## Do some More Writing
-
-### BLah Blah Writing
-
-### Did this work?
-
 
 
 

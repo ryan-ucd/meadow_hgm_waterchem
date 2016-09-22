@@ -1,7 +1,9 @@
 ---
 title: "Classify & Sample Meadows for Sourcewater Study"
 date: "Updated `r format(Sys.time(), '%Y-%m-%d')`"
-output: html_document
+output: 
+  html_document:
+    theme: yeti
 always_allow_html: yes
 ---
 
