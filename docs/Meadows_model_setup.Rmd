@@ -99,11 +99,11 @@ m
 
 library(rgdal)
 WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84" # Projection
-# mdw.sp<- readOGR("./data/base/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.shp", layer="Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m", verbose = F)
-# mdw.sp<-spTransform(mdw.sp, CRS(WGS84))
-# str(mdw.sp@data)
-# mdw.df<-as.data.frame(mdw.sp)
-# plot(mdw.df$LONG_DD, mdw.df$LAT_DD, pch=21, bg="forestgreen", cex=1.2)
+mdw.sp<- readOGR("./data/shps/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.shp", layer="Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m", verbose = F)
+mdw.sp<-spTransform(mdw.sp, CRS(WGS84))
+str(mdw.sp@data)
+mdw.df<-as.data.frame(mdw.sp)
+plot(mdw.df$LONG_DD, mdw.df$LAT_DD, pch=21, bg="forestgreen", cex=1.2)
 
 wxmdw_list<-as.factor(wx.mdw$UCDavis_Object_ID) # LIST OF WX MDWS
 
@@ -112,7 +112,8 @@ mdw.wx.sp <- subset(mdw.sp, ID %in% wxmdw_list)
 mdw.wx.sp <- spTransform(mdw.wx.sp, CRS(WGS84)) # add projection
 
 # Subset to Van Norden & Childs [VN==UCDSNM014503 & Childs==UCDSNM015788]
-mdw.sub.sp <- subset(mdw.sp, ID=="UCDSNM014503" | ID=="UCDSNM015788")
+
+# mdw.sub.sp <- subset(mdw.sp, ID=="UCDSNM014503" | ID=="UCDSNM015788")
 
 # make a leaflet map
 m2 <- leaflet() %>% addTiles() %>% 
@@ -122,10 +123,10 @@ m2 <- leaflet() %>% addTiles() %>%
   addProviderTiles("Thunderforest.Landscape", group = "Topo") %>% 
   
   # proposed sites
-  addPolygons(data=mdw.sub.sp, group="Mdws", weight = 3,
-              fillColor = "yellow", color="orange", fillOpacity = 0.6, 
-              popup=paste0("MDW_ID: ", mdw.sub.sp@data$ID, "<br>", "Elev_Mean (m): ",
-                           mdw.sub.sp@data$ELEV_MEAN)) %>%
+  addPolygons(data=mdw.wx.sp, group="Mdws", weight = 5,
+              fillColor = "orange2", color="orange", fillOpacity = 0.6, 
+              popup=paste0("MDW_ID: ", mdw.wx.sp@data$ID, "<br>", "Elev_Mean (m): ",
+                           mdw.wx.sp@data$ELEV_MEAN)) %>%
   # add controls for basemaps and data
   addLayersControl(
     baseGroups = c("OSM", "ESRI Aerial", "Topo"),
@@ -134,8 +135,6 @@ m2 <- leaflet() %>% addTiles() %>%
 
 # Print Map
 m2
-
-
 
 ```
 

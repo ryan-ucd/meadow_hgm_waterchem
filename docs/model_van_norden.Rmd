@@ -83,8 +83,8 @@ single_y1 <- vn.dat[vn.dat$WY==y1 & vn.dat$ID==mdwID & vn.dat$index=="NDVI",]
 
 p1<- ggplot(data=single_y1, aes(x=DOWY, y=mean)) + 
 	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, color="gray30", alpha=0.5) +
-  geom_point(color="blue2") + # add points
-  stat_smooth(color="blue3", alpha=0.8)+
+  stat_smooth(color="#440154FF", alpha=0.8)+
+  geom_point(fill="#440154FF", pch=21) + # add points
 	scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + ylab("NDVI") + xlab("Day of Water Year") +
 	ggtitle(paste0("NDVI with SD within Van Norden Meadow for ", y1))
@@ -94,10 +94,10 @@ single_y2 <- vn.dat[vn.dat$WY==y2 & vn.dat$ID==mdwID & vn.dat$index=="NDVI",]
 
 p2<-ggplot(data=single_y2, aes(x=DOWY, y=mean)) + 
 	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
-  geom_point(color="maroon")+ # add points
+  stat_smooth(color="#21908CFF", alpha=0.5)+
+  geom_point(fill="#21908CFF", pch=21)+ # add points
   scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + # set to bw theme
-  stat_smooth(color="maroon", alpha=0.5)+
 	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
 	ggtitle(paste0("NDVI with SD within Van Norden Meadow for ", y2))  # title of graph
 
@@ -107,10 +107,10 @@ single_y3 <- vn.dat[vn.dat$WY==y3 & vn.dat$ID==mdwID & vn.dat$index=="NDVI",]
 
 p3<-ggplot(data=single_y3, aes(x=DOWY, y=mean)) + 
 	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
-  geom_point(color="maroon")+ # add points
+  stat_smooth(color="#35B779FF", alpha=0.5) +
+  geom_point(fill="#35B779FF", pch=21)+ # add points
   scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + # set to bw theme
-  stat_smooth(color="maroon", alpha=0.5)+
 	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
 	ggtitle(paste0("NDVI with SD within Van Norden Meadow for ", y3))  #
 
@@ -122,7 +122,7 @@ multiplot(p1, p2, p3)
 
 NDVI is vegetation greeness, so differences are more pronounced during the growing season. In 2011, there was more snow, which remained on the meadow longer and the growing season started later, so values are actually lower earlier in the year. In 2014 the opposite was true, due to a very dry water year which actually permitted an earlier start to vegetation growth in the meadow.
 
-```{r plot-ndwi-varability, include=TRUE, eval=TRUE, echo=FALSE}
+```{r plot-ndwi-variability, include=TRUE, eval=TRUE, echo=FALSE}
 
 source("./scripts/multiplot.R")
 
@@ -134,8 +134,8 @@ single_y1 <- vn.dat[vn.dat$WY==y1 & vn.dat$ID==mdwID & vn.dat$index=="NDWI",]
 
 p1<- ggplot(data=single_y1, aes(x=DOWY, y=mean)) + 
 	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, color="gray30", alpha=0.5) +
-  geom_point(color="blue2") + # add points
-  stat_smooth(color="blue3", alpha=0.2)+
+  stat_smooth(color="#440154FF", alpha=0.2)+
+  geom_point(fill="#440154FF", pch=21) + # add points
 	scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + ylab("NDWI") + xlab("Day of Water Year") +
 	ggtitle(paste0("NDWI with SD within Van Norden Meadow for ", y1))
@@ -145,10 +145,10 @@ single_y2 <- vn.dat[vn.dat$WY==y2 & vn.dat$ID==mdwID & vn.dat$index=="NDWI",]
 
 p2<-ggplot(data=single_y2, aes(x=DOWY, y=mean)) + 
 	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
-  geom_point(color="maroon")+ # add points
+  stat_smooth(color="#21908CFF", alpha=0.2)+
+  geom_point(fill="#21908CFF", pch=21)+ # add points
   scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + # set to bw theme
-  stat_smooth(color="maroon", alpha=0.2)+
 	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
 	ggtitle(paste0("NDWI with SD within Van Norden Meadow for ", y2))  # title of graph
 
@@ -158,10 +158,10 @@ single_y3 <- vn.dat[vn.dat$WY==y3 & vn.dat$ID==mdwID & vn.dat$index=="NDWI",]
 
 p3<-ggplot(data=single_y3, aes(x=DOWY, y=mean)) + 
 	geom_errorbar(aes(ymax = mean + stdDev, ymin=mean - stdDev), width=0.2, alpha=0.8, color="gray30") +
-  geom_point(color="maroon")+ # add points
+  stat_smooth(color="#35B779FF", alpha=0.2)+
+  geom_point(fill="#35B779FF", pch=21)+ # add points
   scale_y_continuous( limits = c(-0.5,1), expand = c(0,0) ) +
 	theme_bw() + # set to bw theme
-  stat_smooth(color="maroon", alpha=0.2)+
 	ylab("NDVI") + xlab("Day of Water Year") + # Set axis labels
 	ggtitle(paste0("NDWI with SD within Van Norden Meadow for ", y3))  #
 
@@ -175,6 +175,64 @@ of HGM types, and build a model which will give us a distribution of probabiliti
 associated with a given HGM type vs. NDVI or NDWI, during a given growing season.
 
 
+## Add a Shiny App
+
+# SHINY PLOT --------------------------------------------------------------
+```{r}
+
+library(shiny)
+shinyApp(
+  ui = fluidPage(
+    h3("NDVI-NDWI"),
+    inputPanel(
+      selectInput("data", label="Data Interval",
+                  choices=c("WY","DOWY","DOY","date"), 
+                  selected="WY"),
+      selectInput("datatype", label = "Mean/Median/SD", 
+                  choices=c("mean","median","stdDev")),
+      radioButtons("type", 
+                   label = "NDVI or NDWI", 
+                   choices = c("NDVI","NDWI"),selected = "NDVI"),
+      checkboxInput("years", label = "Pick one Year", value=FALSE),
+        conditionalPanel(
+          condition="input.years==true",
+          sliderInput("wtyr",value = 1985, 
+                  min = 1984, max = 2015, 
+                  step = 1, sep = FALSE,
+                  label="Pick a Year"))
+    ),
+    mainPanel(
+      plotOutput("Plot", width = "800px", height="500px")
+    )
+  ),
+  
+  server = function(input, output) {
+    
+    output$Plot<-renderPlot({
+      
+      df<-reactive({
+        if(input$years == TRUE) {
+          dplyr::filter(vn.dat, index==input$type, WY %in% input$wtyr)}
+        else{
+          dplyr::filter(vn.dat, index==input$type)
+        }
+      })
+      
+      print(ggplot() + 
+              geom_smooth(
+                data=vn.dat[vn.dat$index==input$type & vn.dat$WY %in% input$wtyr,], aes_string(x=input$data, y=input$datatype),
+                          color="#21908CFF")+
+        geom_point(data=vn.dat[vn.dat$index==input$type & vn.dat$WY %in% input$wtyr,], 
+                   aes_string(x=input$data, y=input$datatype),
+                   color="#21908CFF", pch=21) + 
+        theme_bw()
+      )
+    })
+  }
+)
+```
+
 ## Time for a Model
 
 Use multilevel but use year as a inflation stat/metric?
+
