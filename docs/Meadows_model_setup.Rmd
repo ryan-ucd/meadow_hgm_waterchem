@@ -20,17 +20,22 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressPackageStartupMessages({
   library(dplyr)
 	library(ggplot2)
-	library(lubridate)
+  library(viridis)
+	library(ggthemes)
+  library(lubridate)
 	library(leaflet)
   library(readr)
   library(quickmapr)
   library(rethinking)
   library(rgdal)
+  #library(ggrepel)
   })
 
 #mdw.df<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/UCD_mdw_df.rds") # UCD Dataset for 17,039 meadows
 
 ```
+
+Take original data from previous and munge and merge with updated Dave Weixelman data.
 
 ```{r munge-orig-data, eval=F, echo=T}
 
@@ -66,6 +71,8 @@ head(as.data.frame(wx.mdw2[,c(2,14,16,44:47)]))
 # save for easy reload next time:
 write_rds(x = wx.mdw2, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat2.rds")
 ```
+
+A lot going on in here. First filter data to only selected data (`OK` and not `DRY` or `NOT OK`) based on Dave Weixelman's excel file from **June 05, 2016**. Several meadows were not accessible and were dropped, final list only includes data where there were UCDSNM_ID matches. Then need to recombine and drop HGM classes (*drop dry category `8` and merge `6 & 7`*). Finally write back out as *.rds* file.
 
 ```{r load revised data, eval=F, echo=T}
 
@@ -106,20 +113,69 @@ wx.mdw.sub.UCID <- wx.mdw.sub.UCID %>%
 write_rds(x = wx.mdw.sub.UCID, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
 ```
 
-```{r GEE data merge}
+Need to merge with original GEE data after removing duplicated columns, then filter, rename a col, and save out.
+
+```{r GEE data merge, eval=F, echo=T}
 # HGM data
 wx.mdw.sub<-read_rds(path = "~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
 
 # GEE aata
 load(file = "data/mdw_geedat2.rda")
 
+# Make a list of duplicated column names to filter from merge:
+wx<-names(wx.mdw.sub)
+gee<-names(mdws)
+allcols<-c(wx, gee)
+coldups <- allcols[duplicated(allcols)]
+
+# now select columns that aren't duplicated before merging
+library(magrittr) # to allow for special pipes %<>%
+wx.mdw.sub %<>% select(-one_of(coldups), -source_type.x) # writes back to same object
+
 # merge with GEE data
 mdw.mod.dat<-inner_join(wx.mdw.sub, mdws, by=c("UCDID"="ID"))
+mdw.mod.dat %<>% rename(source_type = source_type.y)
+names(mdw.mod.dat)
 
 write_rds(mdw.mod.dat, "~/Documents/github/meadow_hgm_waterchem/data_output/mdw_mod_GEE.rds")
 
+```
+
+Whew, that was a lot of data munging. Final product is ready though! See below for stats, only 9 meadows with unique UCDIDs. Fine for first cut of model.
+
+```{r final_data}
+
+mdw.dat<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/mdw_mod_GEE.rds")
+unique(mdw.dat$PLOTNAME2) # 16 unique plot names but only 9 unique IDs
+unique(mdw.dat$UCDID) # 16 unique plot names but only 9 unique IDs
+
+# make a violin plot of NDVI
+ggplot(data=mdw.dat[mdw.dat$index=="NDVI",], 
+       aes(x=month, y=mean, group=hgm_class_comb, color=hgm_class_comb)) + 
+  ggtitle("A Plot of NDVI") +
+  geom_point() + scale_color_viridis(discrete = T) +
+  theme_minimal()
+
+# make a dotplot of NDVI
+ggplot(data=mdw.dat[mdw.dat$index=="NDVI" & mdw.dat$month>4 & mdw.dat$month<9,], 
+       aes(x=month, y=mean, fill=hgm_class_comb)) + 
+  ggtitle("A Plot of NDVI") +
+  geom_boxplot() + scale_fill_viridis(discrete = T) +
+  theme_minimal()
+
+
+# make a plot of NDWI
+ggplot(data=mdw.dat[mdw.dat$index=="NDWI",], 
+       aes(date, mean, group=hgm_class_comb, color=hgm_class_comb)) + 
+  ggtitle("A Plot of NDWI") +
+  # geom_text_repel(aes(label = hgm_classes), color = "black", 
+  #                 box.padding = unit(0.5, 'lines')) + 
+  geom_point() + scale_color_viridis(discrete = T) +
+  theme_minimal()
+
 
 ```
+
 
 
 ## Make a Shiny Map
