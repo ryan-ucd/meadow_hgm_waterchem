@@ -1,5 +1,5 @@
 ---
-title: "Set Up Modeling"
+title: "NDVI-HGM-WQ Model"
 author: "Ryan Peek"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -24,15 +24,103 @@ suppressPackageStartupMessages({
 	library(leaflet)
   library(readr)
   library(quickmapr)
+  library(rethinking)
+  library(rgdal)
   })
-```
 
-```{r load-data, echo=FALSE}
-
-wx.mdw<-read_rds("./data_output/wx_mdw_dat.rds")
-mdw.df<-read_rds("./data_output/UCD_mdw_df.rds")
+#mdw.df<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/UCD_mdw_df.rds") # UCD Dataset for 17,039 meadows
 
 ```
+
+```{r munge-orig-data, eval=F, echo=T}
+
+wx.mdw<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat.rds") # weixelman data for 114 meadows
+
+# rename and sort columns a bit
+# Drop HGM source_type 8 (Dry), and combine classes 6 and 7, add elev col
+
+wx.mdw <- wx.mdw %>% 
+  select(PLOT, UCDavisObject_ID:PLOTNAME2, AREA_ACRE:Shape_Area) %>% 
+  rename(Method=METHOD.y, UCDID=UCDavisObject_ID) %>% 
+  mutate(hgm_class_comb = ifelse(source_type==8, NA, source_type), 
+         hgm_class_comb = ifelse(source_type==7, 6, hgm_class_comb),
+         elev_av_2100 = ifelse(ELEV_MEAN<2100, "<2100",">=2100"))
+
+## make a quick meadows type table
+mdw_types<-c("lacustrine fringe", "depressional",
+             "discharge-slope-hillslope",
+             "riparian-discharge-slope", "riparian",
+             "subsurface-discharge-slope",
+             "subsurface", "dry")
+mdw_type_code<-c("lf", "dep", "ds", "rip-ds",
+                 "rip", "sub-ds", "sub", "dry")
+mdw_type_class<-seq(1,8,1)
+
+# bind df
+mdw_hgms<-data.frame("hgm_type"=mdw_types,"hgm_code"=mdw_type_code, "hgm_class"=mdw_type_class )
+
+# now join this with original dataset
+wx.mdw2<-inner_join(wx.mdw, mdw_hgms, by=c("source_type"="hgm_class"))
+head(as.data.frame(wx.mdw2[,c(2,14,16,44:47)]))
+
+# save for easy reload next time:
+write_rds(x = wx.mdw2, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat2.rds")
+```
+
+```{r load revised data, eval=F, echo=T}
+
+wx.mdw<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat2.rds")
+
+# easy ggplot
+# wx.mdw %>% ggplot + aes(x=hgm_class_comb, fill=elev_av_2100) + geom_bar()
+
+# this is the updated data version: 
+wx.mdw.sub<-read_csv("~/Documents/github/meadow_hgm_waterchem/data/water_source_plot_selection_2016_06_05.csv")
+head(wx.mdw.sub)
+
+# filter out the "NOT OK" and select cols of interest:
+wx.mdw.sub <- wx.mdw.sub %>% 
+  mutate(selected=ifelse(Notes=="NOT OK" | Notes=="DRY", 0, 1)) %>% 
+  filter(selected==1) 
+wx.mdw.sub %>% tally(selected) # should be 26 here!
+
+# keep only selected and see how many matches occur:
+dim(inner_join(wx.mdw, wx.mdw.sub, by="PLOT"))  # only 19 match up!
+dim(inner_join(wx.mdw, wx.mdw.sub, by=c("UCDID"="UCDavisObject_ID")))  # 24 match up!
+
+# this is the refiltered data...based on Dave's comments. Re-merge with dataset
+wx.mdw.sub.UCID<-inner_join(wx.mdw, wx.mdw.sub[,c(3,5,11,13)],
+                            by=c("UCDID"="UCDavisObject_ID"))
+wx.mdw.sub.UCID[2,48]<-6 # just make this a 6
+
+# view the categories, note there are a few mismatches...ask Dave?
+wx.mdw.sub.UCID %>% select(source_type.x,source_type.y, hgm_type, hgm_classes) %>% 
+  as.data.frame()
+
+# now re-format the hgm_class_comb column
+wx.mdw.sub.UCID <- wx.mdw.sub.UCID %>% 
+  mutate(hgm_class_comb = ifelse(source_type.y==8, NA, source_type.y), 
+         hgm_class_comb = ifelse(source_type.y==7, 6, hgm_class_comb))
+
+# ok write this out to merge with GEE data later
+write_rds(x = wx.mdw.sub.UCID, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
+```
+
+```{r GEE data merge}
+# HGM data
+wx.mdw.sub<-read_rds(path = "~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
+
+# GEE aata
+load(file = "data/mdw_geedat2.rda")
+
+# merge with GEE data
+mdw.mod.dat<-inner_join(wx.mdw.sub, mdws, by=c("UCDID"="ID"))
+
+write_rds(mdw.mod.dat, "~/Documents/github/meadow_hgm_waterchem/data_output/mdw_mod_GEE.rds")
+
+
+```
+
 
 ## Make a Shiny Map
 
@@ -94,12 +182,14 @@ m
 
 ```
 
+## Subset to the Weixelman Mdws
 
-```{r subset-polygonmdws}
+```{r subset-WEIXmdws, eval=F, echo=T}
 
 library(rgdal)
 WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84" # Projection
-mdw.sp<- readOGR("./data/shps/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.shp", layer="Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m", verbose = F)
+mdw.sp<- readOGR("/Users/ryanpeek/Documents/github/meadow_hgm_waterchem/data/shps/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.shp", layer="Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m", verbose = F)
+
 mdw.sp<-spTransform(mdw.sp, CRS(WGS84))
 str(mdw.sp@data)
 mdw.df<-as.data.frame(mdw.sp)
@@ -110,6 +200,13 @@ wxmdw_list<-as.factor(wx.mdw$UCDavis_Object_ID) # LIST OF WX MDWS
 # Subset the full dataset extracting only the desired attributes
 mdw.wx.sp <- subset(mdw.sp, ID %in% wxmdw_list)
 mdw.wx.sp <- spTransform(mdw.wx.sp, CRS(WGS84)) # add projection
+
+# Write to shp for GEE analysis
+writeOGR(mdw.wx.sp, "./data/shps/", "weix_mdws_hgm_UCD", driver = "ESRI Shapefile")
+```
+
+```{r shiny WEIX mdws}
+mdw.wx.sp<- readOGR("./data/shps/weix_mdws_hgm_UCD.shp", layer = "weix_mdws_hgm_UCD")
 
 # Subset to Van Norden & Childs [VN==UCDSNM014503 & Childs==UCDSNM015788]
 
@@ -137,4 +234,6 @@ m2 <- leaflet() %>% addTiles() %>%
 m2
 
 ```
+
+
 
