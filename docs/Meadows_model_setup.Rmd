@@ -150,11 +150,39 @@ unique(mdw.dat$PLOTNAME2) # 16 unique plot names but only 9 unique IDs
 unique(mdw.dat$UCDID) # 16 unique plot names but only 9 unique IDs
 
 # make a violin plot of NDVI
-ggplot(data=mdw.dat[mdw.dat$index=="NDVI",], 
-       aes(x=month, y=mean, group=hgm_class_comb, color=hgm_class_comb)) + 
-  ggtitle("A Plot of NDVI") +
-  geom_point() + scale_color_viridis(discrete = T) +
-  theme_minimal()
+vio.ndvi<-ggplot(data=mdw.dat[mdw.dat$index=="NDVI" & mdw.dat$month>=6 & mdw.dat$month<9,], 
+       aes(x=as.factor(month), y=mean, fill=as.factor(hgm_class_comb))) + 
+  ggtitle("A Plot of NDVI") + xlab("Month") + guides(fill=guide_legend(title="HGM Type")) +
+  geom_violin() + scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+
+# make a violin plot of NDWI
+vio.ndwi<-ggplot(data=mdw.dat[mdw.dat$index=="NDWI" & mdw.dat$month>=6 & mdw.dat$month<9,], 
+       aes(x=as.factor(month), y=mean, fill=as.factor(hgm_class_comb))) + 
+  ggtitle("A Plot of NDWI") + xlab("Month") + guides(fill=guide_legend(title="HGM Type")) +
+  geom_violin() + scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+
+vio_stack<-cowplot::plot_grid(vio.ndvi, vio.ndwi, align = "v",nrow = 2)
+cowplot::save_plot("./fig_output/violin_ndvi_ndwi_jun-aug.png", plot = vio_stack, ncol = 2,base_aspect_ratio = 0.9, base_height = 6)
+
+# make a box plot of NDVI
+ggplot(data=mdw.dat[mdw.dat$index=="NDVI" & mdw.dat$month>=6 & mdw.dat$month<9,], 
+       aes(x=as.factor(month), y=mean, fill=as.factor(hgm_class_comb))) + 
+  ggtitle("Boxplot of NDVI") + xlab("Month") + guides(fill=guide_legend(title="HGM Type")) +
+  geom_boxplot() + scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+
+# make a box plot of NDWI
+ggplot(data=mdw.dat[mdw.dat$index=="NDWI" & mdw.dat$month>=6 & mdw.dat$month<9,], 
+       aes(x=as.factor(month), y=mean, fill=as.factor(hgm_class_comb))) + 
+  ggtitle("Boxplot of NDWI") + xlab("Month") + guides(fill=guide_legend(title="HGM Type")) +
+  geom_boxplot() + scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+
+
+
+
 
 # make a dotplot of NDVI
 ggplot(data=mdw.dat[mdw.dat$index=="NDVI" & mdw.dat$month>4 & mdw.dat$month<9,], 
@@ -162,7 +190,6 @@ ggplot(data=mdw.dat[mdw.dat$index=="NDVI" & mdw.dat$month>4 & mdw.dat$month<9,],
   ggtitle("A Plot of NDVI") +
   geom_boxplot() + scale_fill_viridis(discrete = T) +
   theme_minimal()
-
 
 # make a plot of NDWI
 ggplot(data=mdw.dat[mdw.dat$index=="NDWI",], 
