@@ -292,7 +292,6 @@ Now that we have the data, we can also assess how these data may fluctuate acros
 
 It appears there is some signal in the data during summer months, particularly for the `Lacustrine Fringe` and `Riparian` HGM types. The `Discharge Slope` appears to have a very large amount of variation inherently in all months across years (water year types), but model will hopefully help delineate if some of this variation can be explained by HGM types and landsat data.
 
-
 ```{r plots by WYT, eval=F, echo=F}
 
 mdw.dat$SAC <- factor(mdw.dat$SAC, levels = c("W", "AN", "BN", "D", "C"))
@@ -449,8 +448,8 @@ dff$flowrange_s<- (dff$FLOW_RANGE - mean(dff$FLOW_RANGE))/ sd(dff$FLOW_RANGE)
 # select to ndvi data only
 names(dff)
 
-ndvi<-dff %>% filter(index=="NDVI") %>% 
-  select(UCDID, name_id, mean, mean_s, SAC, wtyr_typ, wtyr_seq, wtyrlag1,
+ndvi<-dff %>% filter(index=="NDVI", WY>=2000) %>% 
+  select(UCDID, name_id, mean, wtyr_typ, wtyr_seq,
          hgm_class_comb, edgecomplex_s:flowrange_s)
 
 names(ndvi)
@@ -463,40 +462,49 @@ summary(ndvi)
 # make a list of names
 # rename outcomes
 dlist <- list(
+  ndvi=ndvi$mean,
   name=ndvi$name_id,
   wtyr_typ=ndvi$wtyr_typ,
-  wtyr_seq=ndvi$wtyr_seq,
-  wtyrlag1=ndvi$wtyrlag1,
-  ndvi = ndvi$mean, # unscaled
-  ndvi_s = ndvi$mean_s,
-  hgm = ndvi$hgm_class_comb, # hgm ID
-  kf = ndvi$kf_s,
-  clay=ndvi$claytotR_s,
-  domrock=ndvi$domrock,
-  soil=ndvi$soilcomp,
-  flowslope=ndvi$flow_slope_s,
-  edge = ndvi$edgecomplex_s,
-  catcharea = ndvi$catch_s,
-  flowrange= ndvi$flowrange_s,
-  elev=ndvi$elevmean_s
+  hgm = ndvi$hgm_class_comb # hgm ID
+    #wtyr_seq=ndvi$wtyr_seq,
+  #kf = ndvi$kf_s,
+  #clay=ndvi$claytotR_s,
+  #catcharea = ndvi$catch_s,
+  #elev=ndvi$elevmean_s
 )
 
 # Mixed Effect Model with Varying Intercepts for Different Water Years
 
-m1a <- map2stan(
+m1a<-map2stan(
   alist(
-    mean_s ~ dnorm(mu, sigma), 
-    mu <- a + a_wtyr_typ[wtyr_typ] + bhgm*hgm + bclay*clay + 
-      bflowslope*flowslope + belev*elev + 
-      bkf*kf + bedge*edge + bcatch*catcharea,
-    a ~ dnorm(0,10),
-    a_wtyr_typ[wtyr_typ] ~ dnorm(0,sigma),
-    sigma ~ cauchy(0,2),
-    c(bhgm, bclay, bflowslope, belev, bkf, bedge, bcatch) ~ dnorm(0,10)
-  ),
-  data=dlist, chains = 2, warmup = 2000, iter=5000, cores = 2)
+    ndvi ~ dnorm(mu,sigma),
+    mu <- a + a_name + (b + b_name)*hgm,# + (b + b_name)*wtyr_typ,
+    a ~ dnorm(0,100), # intercept
+    b ~ dnorm(0,10), # slope
+    c(a_name,b_name)[name] ~ dmvnorm2(0,sigma_name,Rho_name),
+    sigma_name ~ dcauchy(0,1),
+    Rho_name ~ dlkjcorr(2),
+    sigma ~ dcauchy(0,1)),
+  data=dlist, iter=1000, chains=2,cores=2)
+
+# look at estimates omitting varying effects output
+precis( m1a , depth=2 ,
+    pars=c("a","b","sigma_name","Rho_name") )
+
+# rhats should be 1 or 1.00, and mean and STD should make sense (not wildly variable all over map). Correlations between slope and intercept (Rho_name 1,2 or vice versa) should potentially make sense too.
+
+
+#summary(m1a)
+plot(m1a)
+par(mfrow=c(1,1))
+plot(precis(m1a))
+precis(m1a)
+plot(precis(m1a, depth=2))
+mtext("Varying effects model")
+postcheck(m1a)
 
 ```
+
 
 
 
