@@ -22,15 +22,16 @@ suppressPackageStartupMessages({
   library(lubridate)
 	library(leaflet)
   library(readr)
-  library(quickmapr)
+  #library(quickmapr)
   library(rethinking)
   library(rgdal)
+  library(DT)
   #library(ggrepel)
   })
 
 #mdw.df<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/UCD_mdw_df.rds") # UCD Dataset for 17,039 meadows
 
-mdw.dat<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/mdw_mod_GEE.rds")
+mdw.dat<-read_rds("./data_output/mdw_mod_GEE.rds")
 
 ```
 
@@ -148,7 +149,7 @@ write_rds(mdw.mod.dat, "~/Documents/github/meadow_hgm_waterchem/data_output/mdw_
 
 The Weixelman dataset originally selected **24** meadows, of which there were only 17 unique UCD Meadow IDs, as several of the meadows (`PLOTNAME2`) actually fall within the same UCD ID. In addition, the original Google Earth Engine (*GEE*) dataset that we used did not contain a number of the UCDID's, probably because that data wasn't able to be pulled via the GEE. Need to follow up with Andy on that.
 
-```{r dataset_subs}
+```{r dataset_subs, echo=F, eval=F}
 
 # HGM data
 wx.mdw.sub<-read_rds(path = "~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
@@ -175,7 +176,7 @@ mdw_type_class<-seq(1,8,1)
 # bind df
 mdw_hgms<-data.frame("hgm_type"=mdw_types,"hgm_code"=mdw_type_code, "hgm_class"=mdw_type_class )
 
-DT::datatable(mdw_hgms, rownames = FALSE, autoHideNavigation = T,
+DT::datatable(mdw_hgms, rownames = FALSE,
               class="compact row-border stripe",
               caption=htmltools::tags$caption(
                 style = 'caption-side: bottom; text-align: center;',
@@ -194,7 +195,6 @@ mdw_hgm_rev[6,3]<-6
 mdw_hgm_rev[6,3]<-6
 
 DT::datatable(mdw_hgm_rev,rownames = FALSE,
-              autoHideNavigation = T,
               class="compact row-border stripe",
               caption=htmltools::tags$caption(
                 style = 'caption-side: bottom; text-align: center;',
@@ -210,7 +210,6 @@ DT::datatable(mdw_hgm_rev,rownames = FALSE,
 
 mdw_hgm_rev2<-mdw_hgm_rev[c(1:5),]
 DT::datatable(mdw_hgm_rev2,rownames = FALSE,
-              autoHideNavigation = T,
               class="compact row-border stripe",
               caption=htmltools::tags$caption(
                 style = 'caption-side: bottom; text-align: center;',
@@ -249,6 +248,7 @@ vio.ndwi<-ggplot(data=mdw.dat[mdw.dat$index=="NDWI" & mdw.dat$month>=6 & mdw.dat
   theme_bw() #+ facet_grid(month~.)
 
 vio_stack<-cowplot::plot_grid(vio.ndvi, vio.ndwi, align = "v",nrow = 2)
+vio_stack
 #cowplot::save_plot("./fig_output/violin_ndvi_ndwi_jun-aug.png", plot = vio_stack, ncol = 2,base_aspect_ratio = 0.7, base_height = 6)
 #![violinplots](../fig_output/violin_ndvi_ndwi_jun-aug.png)
 
