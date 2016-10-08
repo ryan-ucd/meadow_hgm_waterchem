@@ -29,9 +29,7 @@ suppressPackageStartupMessages({
   #library(ggrepel)
   })
 
-#mdw.df<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/UCD_mdw_df.rds") # UCD Dataset for 17,039 meadows
-
-mdw.dat<-read_rds("./data_output/mdw_mod_GEE.rds")
+snmmc.mdws<-read_rds("./data_output/UCD_mdw_df.rds") # UCD Dataset for 17,039 meadows
 
 ```
 
@@ -39,9 +37,9 @@ mdw.dat<-read_rds("./data_output/mdw_mod_GEE.rds")
 
 Take original data from previous and munge and merge with updated Dave Weixelman meadows that were selected.
 
-```{r munge-orig-data, eval=F, echo=T}
+```{r munge-orig-data, eval=F, echo=F}
 
-wx.mdw<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat.rds") # weixelman data for 114 meadows
+wx.mdw<-read_rds("./data_output/wx_mdw_dat.rds") # weixelman data for 114 meadows
 
 # rename and sort columns a bit
 # Drop HGM source_type 8 (Dry), and combine classes 6 and 7, add elev col
@@ -71,77 +69,121 @@ wx.mdw2<-inner_join(wx.mdw, mdw_hgms, by=c("source_type"="hgm_class"))
 head(as.data.frame(wx.mdw2[,c(2,14,16,44:47)]))
 
 # save for easy reload next time:
-write_rds(x = wx.mdw2, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat2.rds")
+# write_rds(x = wx.mdw2, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat2.rds")
+
 ```
 
 First filter data to only selected data (`OK` and not `DRY` or `NOT OK`) based on Dave Weixelman's excel file from **June 05, 2016**. Several meadows were not accessible and were dropped, final list only includes data where there were UCDSNM_ID matched. Second, recombine and drop HGM classes (*drop dry category `8` and merge `6 & 7`*). Finally write back out as *.rds* file.
 
-```{r load revised data, eval=F, echo=T}
+```{r load revised data, eval=F, echo=F}
 
-wx.mdw<-read_rds("~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_dat2.rds")
-
-# easy ggplot
-# wx.mdw %>% ggplot + aes(x=hgm_class_comb, fill=elev_av_2100) + geom_bar()
+wx.mdw<-read_rds("./data_output/wx_mdw_dat2.rds")
 
 # this is the updated data version: 
-wx.mdw.sub<-read_csv("~/Documents/github/meadow_hgm_waterchem/data/water_source_plot_selection_2016_06_05.csv")
+wx.mdw.sub<-read_csv("./data/water_source_MDW_selection_2016_10_07.csv")
 head(wx.mdw.sub)
+wx.mdw.sub %>% ggplot + aes(x=hgm_classes, fill=elev_av_2100) + geom_bar()
 
 # filter out the "NOT OK" and select cols of interest:
 wx.mdw.sub <- wx.mdw.sub %>% 
-  mutate(selected=ifelse(Notes=="NOT OK" | Notes=="DRY", 0, 1)) %>% 
-  filter(selected==1) 
-wx.mdw.sub %>% tally(selected) # should be 26 here!
+  mutate(selected=1)
+wx.mdw.sub %>% tally(selected) # should be 33 here!
 
 # keep only selected and see how many matches occur:
 dim(inner_join(wx.mdw, wx.mdw.sub, by="PLOT"))  # only 19 match up!
 dim(inner_join(wx.mdw, wx.mdw.sub, by=c("UCDID"="UCDavisObject_ID")))  # 24 match up!
+dim(merge(wx.mdw, wx.mdw.sub, by.x="UCDID", by.y="UCDavisObject_ID", all.y=T))
 
 # this is the refiltered data...based on Dave's comments. Re-merge with dataset
-wx.mdw.sub.UCID<-inner_join(wx.mdw, wx.mdw.sub[,c(3,5,11,13)],
-                            by=c("UCDID"="UCDavisObject_ID"))
-wx.mdw.sub.UCID[2,48]<-6 # just make this a 6
+wx.mdw.sub.UCID<-left_join(wx.mdw.sub, wx.mdw, by=c("UCDavisObject_ID"="UCDID")) %>% 
+  distinct(UCDavisObject_ID,.keep_all = T) %>% 
+  select(-ends_with(".y"), -c(STATE:Shape_Area)) %>% 
+  rename_(.dots=setNames(names(.), gsub("\\.x", "", names(.))))
 
-# view the categories, note there are a few mismatches...ask Dave?
-wx.mdw.sub.UCID %>% select(source_type.x,source_type.y, hgm_type, hgm_classes) %>% 
-  as.data.frame()
+names(wx.mdw.sub.UCID)
+summary(wx.mdw.sub.UCID)
 
-# now re-format the hgm_class_comb column
-wx.mdw.sub.UCID <- wx.mdw.sub.UCID %>% 
-  mutate(hgm_class_comb = ifelse(source_type.y==8, NA, source_type.y), 
-         hgm_class_comb = ifelse(source_type.y==7, 6, hgm_class_comb))
-
+# write to CSV and fill in blanks:
+write_csv(wx.mdw.sub.UCID, path = "./data_output/wx_mdw_sub_UCID.csv")
 # ok write this out to merge with GEE data later
-write_rds(x = wx.mdw.sub.UCID, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
+# write_rds(x = wx.mdw.sub.UCID, path ="~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
 ```
 
 ### Merge with Google Earth Engine Data
 
 Need to merge with original GEE data after removing duplicated columns, then filter, rename a col, and save out.
 
-```{r GEE data merge, eval=F, echo=T}
-# HGM data
-wx.mdw.sub<-read_rds(path = "~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
+```{r GEE clean and merge, eval=F, echo=F}
+# HGM data ----
+wx.mdw.sub<-read_csv(file = "./data_output/wx_mdw_sub_UCID.csv")
+str(wx.mdw.sub)
 
-# GEE aata
-load(file = "data/mdw_geedat2.rda")
-
-# Make a list of duplicated column names to filter from merge:
+# Make a list of duplicated column names (from SNMMC data) to filter from merge:
 wx<-names(wx.mdw.sub)
-gee<-names(mdws)
+gee<-names(snmmc.mdws)
 allcols<-c(wx, gee)
-coldups <- allcols[duplicated(allcols)]
+col.dups <- allcols[duplicated(allcols)]
 
 # now select columns that aren't duplicated before merging
 library(magrittr) # to allow for special pipes %<>%
-wx.mdw.sub %<>% select(-one_of(coldups), -source_type.x) # writes back to same object
+wx.mdw.sub %<>% select(-one_of(col.dups)) # writes back to same object
+names(wx.mdw.sub)
 
 # merge with GEE data
-mdw.mod.dat<-inner_join(wx.mdw.sub, mdws, by=c("UCDID"="ID"))
-mdw.mod.dat %<>% rename(source_type = source_type.y)
-names(mdw.mod.dat)
+mdw.mod.dat<-inner_join(wx.mdw.sub, snmmc.mdws, by=c("UCDavisObject_ID"="ID"))
+mdw.mod.dat %<>% select(-HGM_TYPE) %>%  dplyr::rename(., UCDID = UCDavisObject_ID)
+names(mdw.mod.dat) # 47 variables, complete dataset
 
-write_rds(mdw.mod.dat, "~/Documents/github/meadow_hgm_waterchem/data_output/mdw_mod_GEE.rds")
+unique(mdw.mod.dat$UCDID) # should have 22!
+
+## GET GEE DATA AND BIND NDVI w NDWI ------
+
+folder='raw/'
+get_csv <- list.files(folder, pattern = "*.csv")
+
+mdws_gee <- data.frame()
+for(i in 1:length(get_csv)) {
+  csv<-read.csv(paste(folder,get_csv[i], sep=""), colClasses = "character")
+  mdws_gee<-rbind(csv, mdws_gee)
+  rm(csv)
+  }
+
+# Now Clean Up Rows
+source(file='./scripts/functions/gee_data_cleanup.R')
+# clean up df
+mdws_gee_dat <- gee_tidy_df(mdws_gee)
+
+# Add Water Year Cols
+source("./scripts/functions/doy.R")
+mdws_gee_dat$date<-ymd(mdws_gee_dat$date)
+mdws_gee_dat$WY<-wtr_yr(mdws_gee_dat$date)
+mdws_gee_dat$DOWY<-dowy(mdws_gee_dat$date)
+mdws_gee_dat$DOY<-yday(mdws_gee_dat$date)
+summary(mdws_gee_dat)
+
+## Add WYT
+wy <- read.csv("./data/wy_type.csv")
+
+add_wy_type<-function(df, wy_df, region){
+  vars <- c("WY", region)
+  wy_region <- wy[vars]
+  names(wy_region)[names(wy_region)==region] <- "WYTYPE"
+  df<-merge(df, wy_region, by="WY")
+  return(df)
+}
+
+mdws_gee_dat <- add_wy_type(mdws_gee_dat, wy, "SJ")
+
+#write_rds(mdws_gee_dat, path="./data_output/hgm_mdws_gee_dat.rds")
+#mdws_gee_dat<-read_rds(path="./data_output/hgm_mdws_gee_dat.rds")
+
+# remove temporary data
+rm(mdws_gee)
+
+## Filter and Join Mdws ------
+mod.hgm.mdws.gee <- inner_join(mdw.mod.dat,mdws_gee_dat, by=c("UCDID"="ID"))
+write_rds(mod.hgm.mdws.gee,"./data_output/mod_hgm_mdw_GEE.rds")
+rm(snmmc.mdws, wx.mdw.sub, mdws_gee_dat)
 
 ```
 
@@ -149,19 +191,17 @@ write_rds(mdw.mod.dat, "~/Documents/github/meadow_hgm_waterchem/data_output/mdw_
 
 The Weixelman dataset originally selected **24** meadows, of which there were only 17 unique UCD Meadow IDs, as several of the meadows (`PLOTNAME2`) actually fall within the same UCD ID. In addition, the original Google Earth Engine (*GEE*) dataset that we used did not contain a number of the UCDID's, probably because that data wasn't able to be pulled via the GEE. Need to follow up with Andy on that.
 
-```{r dataset_subs, echo=F, eval=F}
+```{r loadfinaldata, echo=F, eval=T}
 
-# HGM data
-wx.mdw.sub<-read_rds(path = "~/Documents/github/meadow_hgm_waterchem/data_output/wx_mdw_sub_UCDID.rds")
-
-unique(wx.mdw.sub$UCDID)
-unique(wx.mdw.sub$PLOTNAME2)
+mod.hgm.mdws.gee<- read_rds("./data_output/mod_hgm_mdw_GEE.rds")
+wx.mdws<-read_csv(file = "./data_output/wx_mdw_sub_UCID.csv")
+str(wx.mdws)
 
 ```
 
 See below for stats. The final GEE dataset merged with Weixelman selected meadows gives us 9 meadows with unique UCDIDs. Fine for first cut of model. In comparing NDVI and NDWI, it appears only 5 HGM groups were retained, the subsurface HGM type didn't have any meadows selected and thus doesn't exist in this datase. See table for description of types from original through final GEE dataset.
 
-```{r HGMtypes}
+```{r HGMtypes, eval=T, echo=F}
 library(DT)
 
 mdw_types<-c("lacustrine fringe", "depressional",
@@ -188,11 +228,15 @@ DT::datatable(mdw_hgms, rownames = FALSE,
 
 ```
 
-```{r hgmtypes_revised}
+```{r hgmtypes_revised, eval=T, echo=F}
 
 mdw_hgm_rev<-mdw_hgms[c(1:5,7),]
 mdw_hgm_rev[6,3]<-6
-mdw_hgm_rev[6,3]<-6
+
+# add counts of total meadows per group:
+mod.hgm.mdws.gee  %>% distinct(UCDID,.keep_all = T) %>% group_by(hgm_class_comb)  %>% tally
+
+mdw_hgm_rev$tot_mdws<-c(2,4,5,3,4,4)
 
 DT::datatable(mdw_hgm_rev,rownames = FALSE,
               class="compact row-border stripe",
@@ -200,7 +244,7 @@ DT::datatable(mdw_hgm_rev,rownames = FALSE,
                 style = 'caption-side: bottom; text-align: center;',
                 htmltools::em('Table 2. '), 
                 htmltools::em('Revised HGM Types for selection of meadows')
-              ), colnames = c("HGM Type"=1, "HGM Code"=2, "HGM Class"=3)
+              ), colnames = c("HGM Type"=1, "HGM Code"=2, "HGM Class"=3, "Total Meadows"=4)
 ) %>% DT::formatStyle(columns = 'HGM Type',  color = 'black',fontWeight='bold') %>% 
   DT::formatStyle(columns = 'HGM Class',color = 'white', fontWeight = 'bold',
                   backgroundColor = styleInterval(cuts=c(1,2,3,4,5),
@@ -208,20 +252,23 @@ DT::datatable(mdw_hgm_rev,rownames = FALSE,
                                                              "#2A788EFF", "#22A884FF",
                                                              "#7AD151FF", "#FDE725FF")))
 
-mdw_hgm_rev2<-mdw_hgm_rev[c(1:5),]
-DT::datatable(mdw_hgm_rev2,rownames = FALSE,
-              class="compact row-border stripe",
-              caption=htmltools::tags$caption(
-                style = 'caption-side: bottom; text-align: center;',
-                htmltools::em('Table 3. '), 
-                htmltools::em('Revised HGM Types in final meadow dataset')
-              ), colnames = c("HGM Type"=1, "HGM Code"=2, "HGM Class"=3)
-) %>% DT::formatStyle(columns = 'HGM Type',  color = 'black',fontWeight='bold') %>% 
-  DT::formatStyle(columns = 'HGM Class',color = 'white', fontWeight = 'bold',
-                  backgroundColor = styleInterval(cuts=c(1,2,3,4),
-                                                  values = c("#440154FF", "#3B528BFF",
-                                                             "#21908CFF", "#5DC863FF",
-                                                             "#FDE725FF")))
+# this was when we didn't have subsurface meadows
+# mdw_hgm_rev2<-mdw_hgm_rev[c(1:5),]
+# DT::datatable(mdw_hgm_rev2,rownames = FALSE,
+#               class="compact row-border stripe",
+#               caption=htmltools::tags$caption(
+#                 style = 'caption-side: bottom; text-align: center;',
+#                 htmltools::em('Table 3. '), 
+#                 htmltools::em('Revised HGM Types in final meadow dataset')
+#               ), colnames = c("HGM Type"=1, "HGM Code"=2, "HGM Class"=3)
+# ) %>% DT::formatStyle(columns = 'HGM Type',  color = 'black',fontWeight='bold') %>% 
+#   DT::formatStyle(columns = 'HGM Class',color = 'white', fontWeight = 'bold',
+#                   backgroundColor = styleInterval(cuts=c(1,2,3,4),
+#                                                   values = c("#440154FF", "#3B528BFF",
+#                                                              "#21908CFF", "#5DC863FF",
+#                                                              "#FDE725FF")))
+# 
+
 
 ```
 
@@ -329,7 +376,7 @@ ggplot() + geom_smooth(data=mdw.dat[mdw.dat$index=="NDVI" &
 
 ## Make a Shiny Map of Sites
 
-```{r leaflet-mdws}
+```{r leaflet-mdws, message=F, echo=F}
 library(leaflet)
 
 m <- leaflet() %>% addTiles() %>% 
@@ -342,15 +389,15 @@ m <- leaflet() %>% addTiles() %>%
   
 
 # proposed sites
-  addCircleMarkers(data=mdw.dat, group="Weixelman Sites",
+  addCircleMarkers(data=wx.mdws, group="Weixelman Sites",
                    lng= ~LONG_DD, lat= ~LAT_DD,
                    popup=paste0("<b>Plot:</b> ", 
-                                mdw.dat$PLOTNAME2, "<br>", "<b>HGM Type:</b> ",
-                                mdw.dat$hgm_type, "<br>", "<b>UCD_ID:</b> ",
-                                mdw.dat$UCDID, "<br>", "<b>Area_acres:</b> ",
-                                mdw.dat$AREA_ACRE, "<br>", "<b>HUC12:</b> ",
-                                mdw.dat$HUC12, "<br>", "<b>Elev_mean_m:</b> ",
-                                mdw.dat$ELEV_MEAN),
+                                wx.mdws$PLOTNAME2, "<br>", "<b>HGM Type:</b> ",
+                                wx.mdws$hgm_type, "<br>", "<b>UCD_ID:</b> ",
+                                wx.mdws$UCDavisObject_ID, 
+                                "<br>", "<b>Area_acres:</b> ",
+                                wx.mdws$AREA_ACRE, "<br>", "<b>Elev_mean_m:</b> ",
+                                wx.mdws$ELEV_MEAN),
                    stroke=TRUE, weight=0.6,radius=10,
                    fillOpacity = 0.8, color="black",
                    fillColor = "yellow") %>%
@@ -358,60 +405,12 @@ m <- leaflet() %>% addTiles() %>%
   # add controls for basemaps and data
   addLayersControl(
     baseGroups = c("OSM", "ESRI Aerial", "Topo"),
-    overlayGroups = c("Weixelman Sites","UCD Mdws",
+    overlayGroups = c("Weixelman Sites",
                       "OSM Features"),
     options = layersControlOptions(collapsed = T))
 
 # Print Map
 m
-
-```
-
-```{r subset-WEIXmdws, eval=F, echo=F}
-library(rgdal)
-library(maps)
-# mdw dataset
-mdw.sp<- readOGR("/Users/ryanpeek/Documents/github/meadow_hgm_waterchem/data/shps/Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m.shp", layer="Sierra_Nevada_MultiSource_Meadow_Polygons_Compilation_v1_simplify10m", verbose = F)
-
-wgs84<-CRS("+init=epsg:4326")
-mdw.sp<-spTransform(mdw.sp, CRS(WGS84))
-#mdw.df<-as.data.frame(mdw.sp)
-wxmdw_list<-as.factor(unique(mdw.dat$UCDID)) # LIST OF WX MDWS
-
-# Subset the full dataset extracting only the desired attributes
-mdw.wx.sp <- subset(mdw.sp, ID %in% wxmdw_list)
-
-plot(mdw.wx.sp)
-map('state', 'california',add = T)
-map('county', 'california',col="gray40", lty=2, add = T)
-
-# Write to shp for GEE analysis
-#writeOGR(mdw.wx.sp, "./data/shps/", "weix_mdws_hgm_UCD_v2", driver = "ESRI Shapefile")
-```
-
-```{r shiny WEIX mdws, eval=F, echo=F}
-mdw.wx.sp<- readOGR("./data/shps/weix_mdws_hgm_UCD_v2.shp", layer = "weix_mdws_hgm_UCD_v2")
-
-# make a leaflet map
-m2 <- leaflet() %>% addTiles() %>% 
-  #setView(lng = -120.8, lat = 39, zoom = 8) %>%  # set to Auburn/Colfax, zoom 5 for CA 
-  addTiles(group = "OSM") %>%
-  addProviderTiles("Esri.WorldImagery", group = "ESRI Aerial") %>%
-  addProviderTiles("Thunderforest.Landscape", group = "Topo") %>% 
-  
-  # proposed sites
-  addPolygons(data=mdw.wx.sp, group="Mdws", weight = 5,
-              fillColor = "yellow", color="orange", fillOpacity = 0.6, 
-              popup=paste0("MDW_ID: ", mdw.wx.sp@data$ID, "<br>", "Elev_Mean (m): ",
-                           mdw.wx.sp@data$ELEV_MEAN)) %>%
-  # add controls for basemaps and data
-  addLayersControl(
-    baseGroups = c("OSM", "ESRI Aerial", "Topo"),
-    overlayGroups = c("Mdws"),
-    options = layersControlOptions(collapsed = T))
-
-# Print Map
-m2
 
 ```
 
@@ -421,14 +420,15 @@ Make a simple mode of HGM type vs. WY and NDVI or NDWI, adjusting for individual
 
 ```{r make model dat, echo=T}
 
-dff <- mdw.dat
+dff <- mod.hgm.mdws.gee
 
 # Scale and center data:
-dff$mean_s<- (dff$mean - mean(dff$mean)) / sd(dff$mean) # wait til filtered for 
 
 # NDVI/NDWI
 dff$lat_s<- (dff$LAT_DD - mean(dff$LAT_DD)) / sd(dff$LAT_DD)
-dff$name_id<-coerce_index(dff$UCDID)
+dff$mdw_id<-coerce_index(dff$UCDID)
+
+## NEED TO ADD WYTYPE TO THIS 
 dff$wtyr_typ<-coerce_index(dff$SAC)
 dff$wtyr_seq<-coerce_index(dff$WY)
 dff$wtyrlag1<-dff$wtyr_seq-1 # lag 1 year
@@ -449,7 +449,7 @@ dff$flowrange_s<- (dff$FLOW_RANGE - mean(dff$FLOW_RANGE))/ sd(dff$FLOW_RANGE)
 names(dff)
 
 ndvi<-dff %>% filter(index=="NDVI", WY>=2000) %>% 
-  select(UCDID, name_id, mean, wtyr_typ, wtyr_seq,
+  select(UCDID, mdw_id, mean, wtyr_typ, wtyr_seq,
          hgm_class_comb, edgecomplex_s:flowrange_s)
 
 names(ndvi)
@@ -463,7 +463,7 @@ summary(ndvi)
 # rename outcomes
 dlist <- list(
   ndvi=ndvi$mean,
-  name=ndvi$name_id,
+  mdwID=ndvi$mdw_id,
   wtyr_typ=ndvi$wtyr_typ,
   hgm = ndvi$hgm_class_comb # hgm ID
     #wtyr_seq=ndvi$wtyr_seq,
@@ -473,7 +473,7 @@ dlist <- list(
   #elev=ndvi$elevmean_s
 )
 
-# Mixed Effect Model with Varying Intercepts for Different Water Years
+# Mixed Effect Model with Varying Intercepts for Different HGM types
 
 m1a<-map2stan(
   alist(

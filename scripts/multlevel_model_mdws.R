@@ -9,13 +9,15 @@
 # Load Packages -----------------------------------------------------------
 library(ggplot2)
 library(dplyr)
+library(readr)
 library(lubridate)
 library(stringr)
 library(rethinking)
 
 # LOAD GEE MEADOW DATA ----------------------------------------------------
 
-load(file="data/UCD_mdws_gt10_scaled100m_SNMMPC.Rda")
+mdws<-read_rds(path = "./raw/UCD_mdws_gt10_scaled100m_SNMMPC.rds")
+
 mdws$date<-ymd(mdws$date)
 mdws$wtyr<-wtr_yr(mdws$date)
 mdws$month<-month(mdws$date)

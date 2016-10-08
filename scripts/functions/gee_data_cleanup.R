@@ -41,10 +41,26 @@ gee_tidy_df <- function(raw){
   raw["sensor"] <- sapply(raw$source, parse_sensor)
   raw["index"] <- sapply(raw$source, parse_index)
   raw["mean"]<- as.numeric(raw$mean)
-  #raw["median"]<- as.numeric(raw$median)
-  #raw["stdDev"]<- as.numeric(raw$stdDev)
+  raw["median"]<- as.numeric(raw$median)
+  raw["stdDev"]<- as.numeric(raw$stdDev)
   raw <- subset(raw, select = -c(.geo)) # drop .geo column
   raw[raw==""] <- NA # add NA for blanks
   raw <- na.omit(raw) # remove anything that is blank
   return(raw)
 }
+
+### EXAMPLE
+
+# # read in raw csv
+# raw_ndwi <- read.csv(file='raw/mdws_batch_NDWI_scale100_gt10.csv',  colClasses = "character")
+# raw_ndvi <- read.csv(file='raw/mdws_batch_NDVI_scale100_gt10.csv',  colClasses = "character")
+# 
+# # clean up df
+# ndwi_data <- gee_tidy_df(raw_ndwi)
+# ndvi_data <- gee_tidy_df(raw_ndvi)
+# 
+# # bind both df together
+# data <- rbind(ndwi_data, ndvi_data)
+# 
+# # remove temporary data
+# rm(raw_ndwi, raw_ndvi, ndvi_data, ndwi_data)
