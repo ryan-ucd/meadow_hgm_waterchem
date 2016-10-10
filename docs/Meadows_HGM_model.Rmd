@@ -210,10 +210,14 @@ xy.sp <- SpatialPoints(coords = xy[,c("LONG_DD", "LAT_DD")], proj4string = wgs84
 spdf.sp <- SpatialPointsDataFrame(xy.sp, xy)
 str(spdf.sp)
 
-plot(dwr) # this is slow
-plot(spdf.sp, cex=2, col="red", pch=16, add=T) # this is slow
-gg.dwr<-fortify(dwr)
+# plot(dwr) # this is slow
+# plot(spdf.sp, cex=2, col="red", pch=16, add=T) # this is slow
+
 xy.over<-cbind(xy, over(spdf.sp, dwr[,4:5]))
+#write_rds(xy.over, "./data_output/mdw_pts_w_dwr_region.rds")
+
+
+xy.over <- read_rds("./data_output/mdw_pts_w_dwr_region.rds")
 xy.over
 
 ## SO JUST COMBINE TO NORTH/SOUTH FOR NOW. GET TULARE DATA LATER
@@ -313,7 +317,9 @@ DT::datatable(mdw_hgm_rev,rownames = FALSE,
                                                   values = c("#440154FF", "#414487FF",
                                                              "#2A788EFF", "#22A884FF",
                                                              "#7AD151FF", "#FDE725FF")))
+```
 
+```{r table of selected mdws, eval=T, echo=F}
 
 # Table of Each Meadow and HGM Type for that Meadow
 DT::datatable(mod.hgm %>% distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
@@ -501,28 +507,32 @@ Make a simple mode of HGM type vs. WY and NDVI or NDWI, adjusting for individual
 
 ```{r make model dat, eval=F, echo=T}
 
-# let's take max value for July over all WY's 
-dff <- mod.hgm %>% group_by(UCDID, WY, month) %>% 
+# add month category for aggregating
+dff <- mod.hgm %>% mutate(month=month(date)) %>%
+  group_by(UCDID, WY, month) %>% 
   filter(index=="NDVI", month==7)
-         #median==max(median, na.rm=T))
-boxplot(dff$mean~dff$hgm_class_comb)
+  #median==max(median, na.rm=T))
+
+# boxplot(dff$mean~dff$hgm_class_comb)
+
+# add WY column for modeling (combines both SAC and SJ based on location)
+dff$dwr_name <- as.factor(dff$dwr_name)
+dff$wy_index <- ifelse(dff$dwr_name == "SAC", dff$SAC_Index, dff$SJ_Index)
+summary(dff)
 
 # Scale and center data:
 
-# NDVI/NDWI
 dff$lat_s<- (dff$LAT_DD - mean(dff$LAT_DD)) / sd(dff$LAT_DD)
 dff$mdw_id<-coerce_index(dff$UCDID)
-
-## NEED TO ADD WYTYPE TO THIS 
-dff$sac_ind<-(dff$SAC_Index - mean(dff$SAC_Index)) / sd(dff$SAC_Index)
-dff$wtyr_seq<-coerce_index(dff$WY)
-dff$wtyrlag1<-dff$wtyr_seq-1 # lag 1 year
+dff$wy_indx<-(dff$wy_index - mean(dff$wy_index)) / sd(dff$wy_index)
+#dff$wtyr_seq<-coerce_index(dff$WY)
+#dff$wtyrlag1<-dff$wtyr_seq-1 # lag 1 year
 dff$edgecomplex_s<-(dff$EDGE_COMPL - mean(dff$EDGE_COMPL)) / sd(dff$EDGE_COMPL)
-dff$domrock<-coerce_index(as.factor(dff$DOM_ROCKTY)) # shift factor to numeric
-dff$vegmaj<-coerce_index(as.factor(dff$VEG_MAJORI)) # shift factor to numeric
+#dff$domrock<-coerce_index(as.factor(dff$DOM_ROCKTY)) # shift factor to numeric
+#dff$vegmaj<-coerce_index(as.factor(dff$VEG_MAJORI)) # shift factor to numeric
 dff$kf_s<-(dff$Kf - mean(dff$Kf)) / sd(dff$Kf)
 dff$claytotR_s<-(dff$ClayTot_r - mean(dff$ClayTot_r)) / sd(dff$ClayTot_r)
-dff$soilcomp<-coerce_index(as.factor(dff$COMP_NAME)) # shift factor to numeric
+dff$soilcomp<-coerce_index(as.factor(dff$COMP_NAME)) 
 dff$flow_slope_s<-(dff$FLOW_SLOPE - mean(dff$FLOW_SLOPE)) / sd(dff$FLOW_SLOPE)
 dff$elevmean_s<- (dff$ELEV_MEAN - mean(dff$ELEV_MEAN)) / sd(dff$ELEV_MEAN)
 dff$catch_s<- (dff$CATCHMENT_ - mean(dff$CATCHMENT_)) / sd(dff$CATCHMENT_)
@@ -533,13 +543,13 @@ dff$flowrange_s<- (dff$FLOW_RANGE - mean(dff$FLOW_RANGE))/ sd(dff$FLOW_RANGE)
 names(dff)
 
 ndvi<-dff %>%  
-  select(UCDID, WY, month, mdw_id, mean, median, sac_ind, wtyr_seq,
+  select(UCDID, WY, month, mdw_id, mean, median, wy_indx,
          hgm_class_comb, lat_s, edgecomplex_s:flowrange_s)
 summary(ndvi)
 
 ```
 
-```{r setup model, eval=F, echo=T}
+```{r mod1a, eval=F, echo=T}
 
 names(ndvi)
 
@@ -549,12 +559,14 @@ dlist <- list(
   ndvi_mean=ndvi$mean,
   ndvi_median=ndvi$median,
   mdwID=ndvi$mdw_id,
-  sac=ndvi$sac_ind,
+  wyi=ndvi$wy_indx,
   hgm = ndvi$hgm_class_comb, # hgm ID
   lat=ndvi$lat_s,
   kf = ndvi$kf_s,
   clay=ndvi$claytotR_s,
-  #catcharea = ndvi$catch_s,
+  catcharea = ndvi$catch_s,
+  shape=ndvi$shapearea_s,
+  flowslope=ndvi$flow_slope_s,
   elev=ndvi$elevmean_s
 )
 
@@ -563,15 +575,16 @@ dlist <- list(
 m1a <- map2stan(
   alist(
     ndvi_mean ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bhgm*hgm + belev*elev + bclay*clay +
-      bkf*kf + bsac*sac + blat*lat,
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + bhgm*hgm + 
+      blat*lat + belev*elev + bclay*clay + bkf*kf,
     a ~ dnorm(0,10),
+    #a_wyi[wyi] ~ dnorm(0,sigma),
     a_mdwID[mdwID] ~ dnorm(0,sigma),
     sigma ~ cauchy(0,2),
-    c(belev, bclay, bkf, bsac, blat) ~ dnorm(0,10),
+    c(blat, belev, bclay, bkf, bwyi) ~ dnorm(0,10),
     bhgm ~ dnorm(3,10)
   ),
-  data=dlist, chains = 2, iter=5000, cores=2)
+  data=dlist, chains = 2, iter=5000, cores=3)
 
 
 # look at estimates omitting varying effects output
@@ -589,6 +602,61 @@ mtext("Varying effects model")
 postcheck(m1a)
 
 ```
+
+```{r mod1b } 
+m1b <- map2stan(
+  alist(
+    ndvi_mean ~ dnorm(mu, sigma), 
+    mu <- a + a_hgm[hgm] + bwyi*wyi + bElwy*elev*wyi +
+      belev*elev + bcatch*catcharea + bFslope*flowslope,
+    a ~ dnorm(0,10),
+    #a_wyi[wyi] ~ dnorm(0,sigma),
+    a_hgm[hgm] ~ dnorm(0,sigma),
+    sigma ~ cauchy(0,2),
+    bElwy ~ dnorm(0,10),
+    c(belev, bcatch, bFslope, bwyi) ~ dnorm(0,10)
+  ),
+  data=dlist, chains = 2, iter=5000, cores=3)
+
+summary(m1b) # see all 
+plot(m1b) # see trace plots
+
+par(mfrow=c(1,1))
+plot(precis(m1b)) # see basic results with fixed effects
+plot(precis(m1b, depth=2)) # see full results for each meadow
+mtext("Varying effects model m1b")
+postcheck(m1b)
+
+m1c <- map2stan(
+  alist(
+    ndvi_mean ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + bhgm*hgm + 
+      bWYhgm*wyi*hgm + belev*elev + 
+      bcatch*catcharea + bFslope*flowslope,
+    a ~ dnorm(0,10),
+    #a_hgm[hgm] ~ dnorm(0,sigma),
+    #a_wyi[wyi] ~ dnorm(0,sigma),
+    a_mdwID[mdwID] ~ dnorm(0,sigma),
+    sigma ~ cauchy(0,2),
+    bhgm ~ dnorm(0,10),
+    c(belev, bcatch, bFslope, bwyi, bWYhgm) ~ dnorm(0,10)
+  ),
+  data=dlist, chains = 2, iter=5000, cores=3)
+
+compare(m1a, m1b, m1c)
+plot(m1c)
+
+par(mfrow=c(1,1))
+plot(precis(m1c)) # see basic results with fixed effects
+plot(precis(m1c, depth=2)) # see full results for each meadow
+mtext("Varying effects model m1c")
+postcheck(m1b)
+
+save(m1a,m1b, m1c, file = "../data_output/models_1a-1c.rda")
+
+
+```
+
 
 # Mixed Effect Model with Varying Intercepts for Different HGM types
 
