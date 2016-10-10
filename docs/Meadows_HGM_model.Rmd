@@ -251,9 +251,9 @@ The final GEE dataset merged with Weixelman selected meadows gives us 22 meadows
 
 ```{r final dataset, eval=T, echo=T}
 
-mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds")
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 #names(mod.hgm)
-DT::datatable(head(as.data.frame(mod.hgm)), 
+datatable(head(as.data.frame(mod.hgm)), 
               class="compact row-border stripe",
               caption=htmltools::tags$caption(
                 style = 'caption-side: bottom; text-align: left;',
@@ -310,34 +310,40 @@ DT::datatable(mdw_hgm_rev,rownames = FALSE,
                 style = 'caption-side: bottom; text-align: center;',
                 htmltools::em('Table 3. '), 
                 htmltools::em('Revised HGM Types for selection of meadows')
-              ), colnames = c("HGM Type"=1, "HGM Code"=2, "HGM Class"=3, "Total Meadows"=4)
-) %>% DT::formatStyle(columns = 'HGM Type',  color = 'black',fontWeight='bold') %>% 
-  DT::formatStyle(columns = 'HGM Class',color = 'white', fontWeight = 'bold',
+              ), colnames = c("HGM Type"=1, "HGM Class"=2, "HGM Code"=3, "Total Meadows"=4)
+) %>% formatStyle(columns = 'HGM Type',  color = 'black',fontWeight='bold') %>% 
+  formatStyle(columns = 'HGM Code',color = 'gray', fontWeight = 'bold',
                   backgroundColor = styleInterval(cuts=c(1,2,3,4,5),
-                                                  values = c("#440154FF", "#414487FF",
-                                                             "#2A788EFF", "#22A884FF",
-                                                             "#7AD151FF", "#FDE725FF")))
+                                                  values = c("#440154",
+                                                             "#414487",
+                                                             "#2a788e",
+                                                             "#22a884",
+                                                             "#7ad151",
+                                                             "#fde725")))
 ```
 
 ```{r table of selected mdws, eval=T, echo=F}
+library(tidyr)
+library(magrittr)
+library(dplyr)
 
 # Table of Each Meadow and HGM Type for that Meadow
-DT::datatable(mod.hgm %>% distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
+DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
               rownames = TRUE,
               class="compact row-border stripe",
               caption=htmltools::tags$caption(
                 style = 'caption-side: bottom; text-align: center;',
                 htmltools::em('Table 4. '), 
                 htmltools::em('Selected Meadows for HGM-LANDSAT Model')),
-              colnames = c("RowID"=1, "Plot Name"=2, "UCD_ID"=3, "HGM Type"=4, "HGM Code"=5)) %>%
+              colnames = c("RowID"=1, "UCD_ID"=2,"Plot Name"=3,"HGM Type"=4, "HGM Code"=5)) %>%
   DT::formatStyle(columns = 'HGM Code',color = 'white', fontWeight = 'bold',
                   backgroundColor = styleInterval(cuts=c(1,2,3,4,5),
-                                                  values = c("#440154FF", 
-                                                             "#414487FF",
-                                                             "#2A788EFF", 
-                                                             "#22A884FF",
-                                                             "#7AD151FF",
-                                                             "#FDE725FF"))
+                                                  values = c('#440154', 
+                                                             '#414487',
+                                                             '#2A788E', 
+                                                             '#22A884',
+                                                             '#7AD151',
+                                                             '#FDE725'))
   )
 
 ```
@@ -505,31 +511,31 @@ m
 
 Make a simple mode of HGM type vs. WY and NDVI or NDWI, adjusting for individual meadows. Scale data first.
 
-```{r make model dat, eval=F, echo=T}
+```{r scale model data, eval=F, echo=T}
 
-# add month category for aggregating
-dff <- mod.hgm %>% mutate(month=month(date)) %>%
-  group_by(UCDID, WY, month) %>% 
-  filter(index=="NDVI", month==7)
-  #median==max(median, na.rm=T))
+# Scale Data
+dff <- mod.hgm
+names(dff)
 
-# boxplot(dff$mean~dff$hgm_class_comb)
-
-# add WY column for modeling (combines both SAC and SJ based on location)
+# add month and WY column for modeling (combines both SAC and SJ based on location)
+dff$month<-month(dff$date)
 dff$dwr_name <- as.factor(dff$dwr_name)
-dff$wy_index <- ifelse(dff$dwr_name == "SAC", dff$SAC_Index, dff$SJ_Index)
+dff$wyi <- ifelse(dff$dwr_name == "SAC", dff$SAC_Index, dff$SJ_Index)
 summary(dff)
 
 # Scale and center data:
-
+dff$lf_s<- (dff$LF - mean(dff$LF)) / sd(dff$LF)
+dff$rip_s<- (dff$Riparian - mean(dff$Riparian)) / sd(dff$Riparian)
+dff$sub_s<- (dff$Subsurface - mean(dff$Subsurface)) / sd(dff$Subsurface)
+dff$ds_s<- (dff$DS - mean(dff$DS)) / sd(dff$DS)
+dff$dep_s<- (dff$Depressional - mean(dff$Depressional)) / sd(dff$Depressional)
+dff$dry_s<- (dff$Dry - mean(dff$Dry)) / sd(dff$Dry)
 dff$lat_s<- (dff$LAT_DD - mean(dff$LAT_DD)) / sd(dff$LAT_DD)
 dff$mdw_id<-coerce_index(dff$UCDID)
-dff$wy_indx<-(dff$wy_index - mean(dff$wy_index)) / sd(dff$wy_index)
-#dff$wtyr_seq<-coerce_index(dff$WY)
-#dff$wtyrlag1<-dff$wtyr_seq-1 # lag 1 year
+dff$wyi_s<-(dff$wyi - mean(dff$wyi)) / sd(dff$wyi)
 dff$edgecomplex_s<-(dff$EDGE_COMPL - mean(dff$EDGE_COMPL)) / sd(dff$EDGE_COMPL)
-#dff$domrock<-coerce_index(as.factor(dff$DOM_ROCKTY)) # shift factor to numeric
-#dff$vegmaj<-coerce_index(as.factor(dff$VEG_MAJORI)) # shift factor to numeric
+dff$domrock<-coerce_index(as.factor(dff$DOM_ROCKTY)) # shift factor to numeric
+dff$vegmaj<-coerce_index(as.factor(dff$VEG_MAJORI)) # shift factor to numeric
 dff$kf_s<-(dff$Kf - mean(dff$Kf)) / sd(dff$Kf)
 dff$claytotR_s<-(dff$ClayTot_r - mean(dff$ClayTot_r)) / sd(dff$ClayTot_r)
 dff$soilcomp<-coerce_index(as.factor(dff$COMP_NAME)) 
@@ -539,52 +545,102 @@ dff$catch_s<- (dff$CATCHMENT_ - mean(dff$CATCHMENT_)) / sd(dff$CATCHMENT_)
 dff$shapearea_s<- (dff$Shape_Area - mean(dff$Shape_Area)) / sd(dff$Shape_Area)
 dff$flowrange_s<- (dff$FLOW_RANGE - mean(dff$FLOW_RANGE))/ sd(dff$FLOW_RANGE)
 
-# select to ndvi data only
+# Look at Columns
 names(dff)
+dff %>% filter(index=="NDWI", month==8) %>% tally # count records for ndwi
+dff %>% filter(index=="NDVI", month==8) %>% tally
 
-ndvi<-dff %>%  
-  select(UCDID, WY, month, mdw_id, mean, median, wy_indx,
-         hgm_class_comb, lat_s, edgecomplex_s:flowrange_s)
-summary(ndvi)
+# add month col and select max months
+dfVI <- dff %>% 
+  group_by(UCDID, WY, month) %>% 
+  filter(index=="NDVI", month==8, mean==max(mean, na.rm=T)) %>%
+  select(UCDID, mdw_id, WY, month, mean, hgm_class_comb, lf_s:lat_s,
+         wyi_s:flowrange_s,LF:Depressional)
+  
+dfWI <- dff %>% 
+  group_by(UCDID, WY, month) %>% 
+  filter(index=="NDWI", month==8) %>% 
+  filter(mean==max(mean)) %>%
+  select(UCDID, mdw_id, WY, month, mean, hgm_class_comb, lf_s:lat_s,
+         wyi_s:flowrange_s,LF:Depressional)
+
+save(dff, dfVI, dfWI, file = "./data_output/model_datasets_AUG.rda") 
 
 ```
 
-```{r mod1a, eval=F, echo=T}
+```{r load mod datasets, eval=T, echo=F}
+# Full Dataset
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 
-names(ndvi)
+# Model Datasets
+load("./data_output/model_datasets_AUG.rda")
 
-# make a list of names
-# rename outcomes
-dlist <- list(
-  ndvi_mean=ndvi$mean,
-  ndvi_median=ndvi$median,
-  mdwID=ndvi$mdw_id,
-  wyi=ndvi$wy_indx,
-  hgm = ndvi$hgm_class_comb, # hgm ID
-  lat=ndvi$lat_s,
-  kf = ndvi$kf_s,
-  clay=ndvi$claytotR_s,
-  catcharea = ndvi$catch_s,
-  shape=ndvi$shapearea_s,
-  flowslope=ndvi$flow_slope_s,
-  elev=ndvi$elevmean_s
+# NDVI
+names(dfVI)
+summary(dfVI)
+
+# make a list of name (rename outcomes)
+dlist1 <- list(
+  ndvi=dfVI$mean,
+  mdwID=dfVI$mdw_id,
+  wyi=dfVI$wyi_s,
+  hgm = dfVI$hgm_class_comb, # hgm ID
+  rip = dfVI$rip_s,
+  lacfr = dfVI$lf_s,
+  sub = dfVI$sub_s,
+  ds = dfVI$ds_s,
+  dep = dfVI$dep_s
+  #lat=dfVI$lat_s,
+  #kf = dfVI$kf_s,
+  #clay=dfVI$claytotR_s,
+  #catcharea = dfVI$catch_s,
+  #shape=dfVI$shapearea_s,
+  #flowslope=dfVI$flow_slope_s,
+  #elev=dfVI$elevmean_s
 )
+
+# NDWI
+names(dfWI)
+
+# make a list of name (rename outcomes)
+dlist2 <- list(
+  ndwi=dfWI$mean,
+  mdwID=dfWI$mdw_id,
+  wyi=dfWI$wyi_s,
+  hgm = dfWI$hgm_class_comb, # hgm ID
+  lacfr = dfWI$lf_s,
+  rip = dfWI$rip_s,
+  sub = dfWI$sub_s,
+  ds = dfWI$ds_s,
+  dep = dfWI$dep_s
+  #lat=dfWI$lat_s,
+  #kf = dfWI$kf_s,
+  #clay=dfWI$claytotR_s,
+  #catcharea = dfWI$catch_s,
+  #shape=dfWI$shapearea_s,
+  #flowslope=dfWI$flow_slope_s,
+  #elev=dfWI$elevmean_s
+)
+
+```
+
+
+```{r mod1a, eval=F, echo=T}
 
 # START SIMPLE
 
 m1a <- map2stan(
   alist(
-    ndvi_mean ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bwyi*wyi + bhgm*hgm + 
-      blat*lat + belev*elev + bclay*clay + bkf*kf,
+    ndvi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip +
+      bsub*sub + bds*ds + 
+      bdep*dep + blacfr*lacfr,
+    c(bwyi, rip, sub, ds, dep, lacfr) ~ dnorm(0,10),
     a ~ dnorm(0,10),
-    #a_wyi[wyi] ~ dnorm(0,sigma),
     a_mdwID[mdwID] ~ dnorm(0,sigma),
-    sigma ~ cauchy(0,2),
-    c(blat, belev, bclay, bkf, bwyi) ~ dnorm(0,10),
-    bhgm ~ dnorm(3,10)
+    sigma ~ cauchy(0,5)
   ),
-  data=dlist, chains = 2, iter=5000, cores=3)
+  data=dlist1, chains = 2, iter=5000, cores=4)
 
 
 # look at estimates omitting varying effects output
