@@ -293,7 +293,7 @@ DT::datatable(mdw_hgms, rownames = FALSE,
 
 ```
 
-```{r hgmtypes_revised, eval=T, echo=F}
+```{r hgmtypes_revised, eval=F, echo=F}
 
 mdw_hgm_rev<-mdw_hgms[c(1:5,7),]
 mdw_hgm_rev[6,3]<-6
@@ -320,32 +320,6 @@ DT::datatable(mdw_hgm_rev,rownames = FALSE,
                                                              "#22a884",
                                                              "#7ad151",
                                                              "#fde725")))
-```
-
-```{r table of selected mdws, eval=T, echo=F}
-library(tidyr)
-library(magrittr)
-library(dplyr)
-
-# Table of Each Meadow and HGM Type for that Meadow
-DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
-              rownames = TRUE,
-              class="compact row-border stripe",
-              caption=htmltools::tags$caption(
-                style = 'caption-side: bottom; text-align: center;',
-                htmltools::em('Table 4. '), 
-                htmltools::em('Selected Meadows for HGM-LANDSAT Model')),
-              colnames = c("RowID"=1, "UCD_ID"=2,"Plot Name"=3,"HGM Type"=4, "HGM Code"=5)) %>%
-  DT::formatStyle(columns = 'HGM Code',color = 'white', fontWeight = 'bold',
-                  backgroundColor = styleInterval(cuts=c(1,2,3,4,5),
-                                                  values = c('#440154', 
-                                                             '#414487',
-                                                             '#2A788E', 
-                                                             '#22A884',
-                                                             '#7AD151',
-                                                             '#FDE725'))
-  )
-
 ```
 
 ## Plots
@@ -592,7 +566,7 @@ dlist1 <- list(
   sub=dfVI$sub_s,
   ds=dfVI$ds_s,
   dep=dfVI$dep_s,
-  #hgm = dfVI$hgm_class_comb, # hgm ID
+  hgm = dfVI$hgm_class_comb, # hgm ID
   lat=dfVI$lat_s,
   kf = dfVI$kf_s,
   clay=dfVI$claytotR_s,
@@ -615,7 +589,7 @@ dlist2 <- list(
   sub=dfWI$sub_s,
   ds=dfWI$ds_s,
   dep=dfWI$dep_s,
-  #hgm=dfWI$hgm_class_comb, # hgm ID
+  hgm=dfWI$hgm_class_comb, # hgm ID
   lat=dfWI$lat_s,
   kf = dfWI$kf_s,
   clay=dfWI$claytotR_s,
@@ -624,6 +598,32 @@ dlist2 <- list(
   flowslope=dfWI$flow_slope_s,
   elev=dfWI$elevmean_s
 )
+
+```
+
+```{r table of selected mdws, eval=T, echo=F}
+library(tidyr)
+library(magrittr)
+library(dplyr)
+
+# Table of Each Meadow and HGM Type for that Meadow
+DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
+              rownames = TRUE,
+              class="compact row-border stripe",
+              caption=htmltools::tags$caption(
+                style = 'caption-side: bottom; text-align: center;',
+                htmltools::em('Table 4. '), 
+                htmltools::em('Selected Meadows for HGM-LANDSAT Model')),
+              colnames = c("RowID"=1, "UCD_ID"=2,"Plot Name"=3,"HGM Type"=4, "HGM Code"=5)) %>%
+  DT::formatStyle(columns = 'HGM Code',color = 'white', fontWeight = 'bold',
+                  backgroundColor = styleInterval(cuts=c(1,2,3,4,5),
+                                                  values = c('#440154', 
+                                                             '#414487',
+                                                             '#2A788E', 
+                                                             '#22A884',
+                                                             '#7AD151',
+                                                             '#FDE725'))
+  )
 
 ```
 
@@ -637,42 +637,141 @@ m1a <- map2stan(
     ndvi ~ dnorm(mu, sigma), 
     mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
       bsub*sub + bds*ds + bdep*dep,
-    a ~ dnorm(11,100),
-    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    a ~ dnorm(0,100),
+    a_mdwID[mdwID] ~ dnorm(0,sigma),
     c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2)
+    sigma ~ cauchy(0,3)
   ),
-  data=dlist1, chains = 2, iter=5000, cores=2)
+  data=dlist1, chains = 2, iter=5000, cores=4)
 
 m2a <- map2stan(
   alist(
     ndwi ~ dnorm(mu, sigma), 
     mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
       bsub*sub + bds*ds + bdep*dep,
-    a ~ dnorm(11,100),
-    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    a ~ dnorm(0,100),
+    a_mdwID[mdwID] ~ dnorm(0,sigma),
     c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2)
+    sigma ~ cauchy(0,3)
   ),
-  data=dlist2, chains = 2, iter=5000, cores=2)
+  data=dlist2, chains = 2, iter=5000, cores=4)
 
+# SAVE THEM
+save(m1a, m2a, file = "./data_output/models_1a_1b_revised.rda")
 
 # look at estimates omitting varying effects output
 precis( m1a , depth=2)
-
+precis( m2a , depth=2)
 # rhats should be 1 or 1.00, and mean and STD should make sense (not wildly variable all over map).
 
-summary(m1a) # see all 
-plot(m1a) # see trace plots
+plot(m1a) # see trace plots, look good.
+plot(m2a) # see trace plots, look good.
 
-par(mfrow=c(1,1))
+par(mfrow=c(1,1)) # clear the plots
+
+## MOD 1A
+png(filename = "./fig_output/m1a_precis.png", width = 9, height = 6.6, units = "in", res = 200)
 plot(precis(m1a)) # see basic results with fixed effects
+mtext("Varying effects (Mdws) model NDVI")
+dev.off()
+
+png(filename = "./fig_output/m1a_precis_all.png", width = 9, height = 6.6, units = "in", res = 200)
 plot(precis(m1a, depth=2)) # see full results for each meadow
-mtext("Varying effects model")
-postcheck(m1a)
+mtext("Varying effects model (Mdws) NDVI")
+dev.off()
+
+## MOD 2A
+png(filename = "./fig_output/m2a_precis.png", width = 9, height = 6.6, units = "in", res = 200)
+plot(precis(m2a)) # see basic results with fixed effects
+mtext("Varying effects (Mdws) model NDWI")
+dev.off()
+
+png(filename = "./fig_output/m2a_precis_all.png", width = 9, height = 6.6, units = "in", res = 200)
+plot(precis(m2a, depth=2)) # see full results for each meadow
+mtext("Varying effects model (Mdws) NDWI")
+dev.off()
+
+compare(m1a, m2a)
+load(file = "./data_output/models_1a_1b_revised.rda")
+#abline(v = 1, col=col.alpha("gray",0.5))
+
+## EXTRACT POSTERIORS
+post1a<-extract.samples(m1a)
+post2a<-extract.samples(m2a)
+
+## Plot Densities M1A
+dens(post1a$a_mdwID, xlim=c(-0.5, 1), 
+     ylim=c(0,20), lty=2, show.HPDI = T)
+#dens(post1a$a, col="red", show.HPDI = F, add=T, lwd=1.5)
+#dens(post1a$bwyi, col="forestgreen", show.HPDI = T, add=T)
+dens(post1a$brip, col="green", show.HPDI = T, lwd=1.5, add=T)
+dens(post1a$bds, col="tan", show.HPDI = F, lwd=1.5, add=T)
+dens(post1a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
+dens(post1a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
+dens(post1a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
+dens(post1a$sigma, col="red", show.HPDI = F, add=T, lwd=1, lty=2)
+
+## Plot Densities M2A
+dens(post2a$a_mdwID, xlim=c(-0.5, 1), 
+     ylim=c(0,12), lty=2, show.HPDI = T)
+#dens(post1a$a, col="red", show.HPDI = F, add=T, lwd=1.5)
+#dens(post1a$bwyi, col="forestgreen", show.HPDI = T, add=T)
+dens(post2a$brip, col="green", show.HPDI = T, lwd=1.5, add=T)
+dens(post2a$bds, col="tan", show.HPDI = F, lwd=1.5, add=T)
+dens(post2a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
+dens(post2a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
+dens(post2a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
+
 
 ```
 
+## Multi-level Model
+
+Add different "actor" (so have two variables with changing intercepts). See page 376 in McElreath's book. Nice comparison of the two different sigmas (in this case it would be mdwID and hgm), to show one was stronger than other but including both doesn't add all that much (or detract much) from the model.
+
+
+```{r multintercept, eval=T, echo=T}
+
+m1b <- map2stan(
+  alist(
+    ndvi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID + a_hgm + bwyi*wyi +
+      belev*elev + bcatch*catcharea + bFslope*flowslope +
+      blat*lat + bkf*kf + bclay + bshape*shape,
+    a_mdwID[mdwID] ~ dnorm(0, sigma_mdwID),
+    a_hgm[hgm] ~ dnorm(0, sigma_hgm),
+    a ~ dnorm(0,100),
+    c(a, bwyi, belev, bcatch, 
+      bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    sigma ~ cauchy(0,3),
+    sigma_mdwID ~ dcauchy(0,1),
+    sigma_hgm ~ dcauchy(0,1)
+  ),
+  data=dlist1, chains = 2, iter=5000, cores=4)
+
+precis(m1b)
+
+plot(m1b)
+
+compare(m1a, m1b)
+
+#       WAIC pWAIC dWAIC weight    SE  dSE
+#m1b -1794.6  26.4   0.0   0.84 89.15   NA
+#m1a -1791.3  27.0   3.3   0.16 88.43 2.27
+
+post1b <- extract.samples(m1b)
+dens( post1b$sigma_hgm , xlab="sigma" )
+dens( post1b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
+text( 0.1, 22, "Mdw ID" , col=rangi2 )
+text( 0.03 , 22 , "HGM Class" )
+
+# Looks like each varies about the same, though Mdw ID appears to have more variation than HGM Class within the model (makes sense).
+
+
+```
+
+
+        
 ```{r modb_hgm_dat, eval=F, echo=T} 
 # Now add some of the meta meadow variables like elev, flowslope, etc.
 m1b <- map2stan(
@@ -714,44 +813,9 @@ plot(precis(m1b, depth=2)) # see full results for each meadow
 mtext("Varying effects model m1b")
 postcheck(m1b)
 
-
-save(m1a,m2a,m1b,m2b, file = "./data_output/models_1a_1b_revised.rda")
-
-```
-
-
-```{r mod1c, eval=F, echo=T}
-# now add interactions
-m1c <- map2stan(
-  alist(
-    ndvi_mean ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bwyi*wyi + bhgm*hgm + 
-      bWYhgm*wyi*hgm + belev*elev + 
-      bcatch*catcharea + bFslope*flowslope,
-    a ~ dnorm(0,10),
-    #a_hgm[hgm] ~ dnorm(0,sigma),
-    #a_wyi[wyi] ~ dnorm(0,sigma),
-    a_mdwID[mdwID] ~ dnorm(0,sigma),
-    sigma ~ cauchy(0,2),
-    bhgm ~ dnorm(0,10),
-    c(belev, bcatch, bFslope, bwyi, bWYhgm) ~ dnorm(0,10)
-  ),
-  data=dlist, chains = 2, iter=5000, cores=3)
-
-compare(m1a, m1b, m1c)
-plot(m1c)
-
-par(mfrow=c(1,1))
-plot(precis(m1c)) # see basic results with fixed effects
-plot(precis(m1c, depth=2)) # see full results for each meadow
-mtext("Varying effects model m1c")
-postcheck(m1b)
-
-save(m1a,m1b, m1c, file = "../data_output/models_1a-1c.rda")
-
+save(m2a,m2b, file = "./data_output/models_2a_2b_revised.rda")
 
 ```
-
 
 # Mixed Effect Model with Varying Intercepts for Different HGM types
 
@@ -779,3 +843,49 @@ precis( m1a , depth=2,
 ```
 
 
+# BRT Models
+
+```{r BRT}
+
+source("./scripts/functions/brt.functions.R")
+
+
+library(gbm)
+library(dismo)
+
+
+# Build model using code from Elith & Leathwick
+set.seed(33)  # set seed to get repeatable model              
+
+# BRT model: shannon -----
+
+brtWI<-select(dfWI, mean, hgm_class_comb:flowrange_s)
+
+gbm1a <- gbm.step(data=brtWI,
+                  gbm.x = c(2:21),          
+                  gbm.y = 1, 
+                  family = "gaussian",
+                  tree.complexity = 2,   
+                  learning.rate = 0.005, 
+                  bag.fraction = 0.75,
+                  n.folds=10)   
+
+summary(gbm1a)
+
+# with NA included in model
+topn3 = sum((summary(gbm3a, plotit=FALSE)$rel.inf)>=2)
+topvar3 = as.character(summary(gbm3a, plotit=FALSE)$var[1:topn3])
+
+par(mar=c(5,12,3,3))
+barplot(rev(summary(gbm3a, plotit=FALSE)$rel.inf[1:topn3]), 
+        horiz = TRUE, col = viridis(topn3), 
+        names = rev(summary(gbm3a, plotit=FALSE)$var[1:topn3]), 
+        xlab = "Relative influence",
+        las=1, 
+        main=paste0("Relative Influence: \nTop ",topn3," Vars, Shannon Index"))
+
+# par(mar=c(5,4,2,3),oma=c(1,1,1,1), xpd=TRUE); gbm.plot(gbm3a, n.plots = 12, plot.layout=c(4,3), write.title=FALSE)
+
+
+
+```
