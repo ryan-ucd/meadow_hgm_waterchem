@@ -328,7 +328,7 @@ library(magrittr)
 library(dplyr)
 
 # Table of Each Meadow and HGM Type for that Meadow
-DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
+DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
               rownames = TRUE,
               class="compact row-border stripe",
               caption=htmltools::tags$caption(
@@ -388,7 +388,7 @@ cowplot::save_plot("./fig_output/violin_ndvi_ndwi_jun-aug.png", plot = vio_stack
 
 ### Boxplots
 
-Here are the same data (MEANS of LANDSAT DATA) with the same groupings using notched boxplots to assess if medians are significantly different. Notches are used to compare groups; if the notches of two boxes do not overlap, this suggests that the medians are significantly different.
+ Here are the same data (MEANS of LANDSAT DATA) with the same groupings using notched boxplots to assess if medians are significantly different. Notches are used to compare groups; if the notches of two boxes do not overlap, this suggests that the medians are significantly different.
 
 ```{r boxplots, eval=F, echo=T}
 
@@ -579,24 +579,27 @@ load("./data_output/model_datasets_AUG.rda")
 names(dfVI)
 summary(dfVI)
 
+dfVI<-as.data.frame(dfVI)
+dfWI<-as.data.frame(dfWI)
+
 # make a list of name (rename outcomes)
 dlist1 <- list(
   ndvi=dfVI$mean,
   mdwID=dfVI$mdw_id,
   wyi=dfVI$wyi_s,
-  hgm = dfVI$hgm_class_comb, # hgm ID
-  rip = dfVI$rip_s,
-  lacfr = dfVI$lf_s,
-  sub = dfVI$sub_s,
-  ds = dfVI$ds_s,
-  dep = dfVI$dep_s
-  #lat=dfVI$lat_s,
-  #kf = dfVI$kf_s,
-  #clay=dfVI$claytotR_s,
-  #catcharea = dfVI$catch_s,
-  #shape=dfVI$shapearea_s,
-  #flowslope=dfVI$flow_slope_s,
-  #elev=dfVI$elevmean_s
+  rip=dfVI$rip_s,
+  lf=dfVI$lf_s,
+  sub=dfVI$sub_s,
+  ds=dfVI$ds_s,
+  dep=dfVI$dep_s,
+  #hgm = dfVI$hgm_class_comb, # hgm ID
+  lat=dfVI$lat_s,
+  kf = dfVI$kf_s,
+  clay=dfVI$claytotR_s,
+  catcharea = dfVI$catch_s,
+  shape=dfVI$shapearea_s,
+  flowslope=dfVI$flow_slope_s,
+  elev=dfVI$elevmean_s
 )
 
 # NDWI
@@ -607,40 +610,51 @@ dlist2 <- list(
   ndwi=dfWI$mean,
   mdwID=dfWI$mdw_id,
   wyi=dfWI$wyi_s,
-  hgm = dfWI$hgm_class_comb, # hgm ID
-  lacfr = dfWI$lf_s,
-  rip = dfWI$rip_s,
-  sub = dfWI$sub_s,
-  ds = dfWI$ds_s,
-  dep = dfWI$dep_s
-  #lat=dfWI$lat_s,
-  #kf = dfWI$kf_s,
-  #clay=dfWI$claytotR_s,
-  #catcharea = dfWI$catch_s,
-  #shape=dfWI$shapearea_s,
-  #flowslope=dfWI$flow_slope_s,
-  #elev=dfWI$elevmean_s
+  rip=dfWI$rip_s,
+  lf=dfWI$lf_s,
+  sub=dfWI$sub_s,
+  ds=dfWI$ds_s,
+  dep=dfWI$dep_s,
+  #hgm=dfWI$hgm_class_comb, # hgm ID
+  lat=dfWI$lat_s,
+  kf = dfWI$kf_s,
+  clay=dfWI$claytotR_s,
+  catcharea = dfWI$catch_s,
+  shape=dfWI$shapearea_s,
+  flowslope=dfWI$flow_slope_s,
+  elev=dfWI$elevmean_s
 )
 
 ```
 
+```{r moda_hgm_only, eval=F, echo=T}
 
-```{r mod1a, eval=F, echo=T}
-
-# START SIMPLE
+# START SIMPLE: model of HGM types (proportion per type per meadow)
+# and WY index values
 
 m1a <- map2stan(
   alist(
     ndvi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip +
-      bsub*sub + bds*ds + 
-      bdep*dep + blacfr*lacfr,
-    c(bwyi, rip, sub, ds, dep, lacfr) ~ dnorm(0,10),
-    a ~ dnorm(0,10),
-    a_mdwID[mdwID] ~ dnorm(0,sigma),
-    sigma ~ cauchy(0,5)
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
+      bsub*sub + bds*ds + bdep*dep,
+    a ~ dnorm(11,100),
+    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
+    sigma ~ cauchy(0,2)
   ),
-  data=dlist1, chains = 2, iter=5000, cores=4)
+  data=dlist1, chains = 2, iter=5000, cores=2)
+
+m2a <- map2stan(
+  alist(
+    ndwi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
+      bsub*sub + bds*ds + bdep*dep,
+    a ~ dnorm(11,100),
+    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
+    sigma ~ cauchy(0,2)
+  ),
+  data=dlist2, chains = 2, iter=5000, cores=2)
 
 
 # look at estimates omitting varying effects output
@@ -659,20 +673,37 @@ postcheck(m1a)
 
 ```
 
-```{r mod1b } 
+```{r modb_hgm_dat, eval=F, echo=T} 
+# Now add some of the meta meadow variables like elev, flowslope, etc.
 m1b <- map2stan(
   alist(
-    ndvi_mean ~ dnorm(mu, sigma), 
-    mu <- a + a_hgm[hgm] + bwyi*wyi + bElwy*elev*wyi +
-      belev*elev + bcatch*catcharea + bFslope*flowslope,
-    a ~ dnorm(0,10),
-    #a_wyi[wyi] ~ dnorm(0,sigma),
-    a_hgm[hgm] ~ dnorm(0,sigma),
-    sigma ~ cauchy(0,2),
-    bElwy ~ dnorm(0,10),
-    c(belev, bcatch, bFslope, bwyi) ~ dnorm(0,10)
+    ndvi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
+      bsub*sub + bds*ds + bdep*dep + 
+      belev*elev + bcatch*catcharea + bFslope*flowslope +
+      blat*lat + bkf*kf + bclay + bshape*shape,
+    a ~ dnorm(11,100),
+    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    c(bwyi, brip, blf, bsub, bds, bdep,
+      belev, bcatch, bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    sigma ~ cauchy(0,2)
   ),
-  data=dlist, chains = 2, iter=5000, cores=3)
+  data=dlist1, chains = 2, iter=5000, cores=2)
+
+m2b <- map2stan(
+  alist(
+    ndwi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
+      bsub*sub + bds*ds + bdep*dep + 
+      belev*elev + bcatch*catcharea + bFslope*flowslope +
+      blat*lat + bkf*kf + bclay + bshape*shape,
+    a ~ dnorm(11,100),
+    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    c(bwyi, brip, blf, bsub, bds, bdep,
+      belev, bcatch, bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    sigma ~ cauchy(0,2)
+  ),
+  data=dlist2, chains = 2, iter=5000, cores=2)
 
 summary(m1b) # see all 
 plot(m1b) # see trace plots
@@ -683,6 +714,14 @@ plot(precis(m1b, depth=2)) # see full results for each meadow
 mtext("Varying effects model m1b")
 postcheck(m1b)
 
+
+save(m1a,m2a,m1b,m2b, file = "./data_output/models_1a_1b_revised.rda")
+
+```
+
+
+```{r mod1c, eval=F, echo=T}
+# now add interactions
 m1c <- map2stan(
   alist(
     ndvi_mean ~ dnorm(mu, sigma), 
