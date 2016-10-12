@@ -710,7 +710,7 @@ compare(m1a, m2a)
 
 par(mfrow=c(1,2))
 plot(precis(m1a))
-plot(precis(m2a), xlim=c(0,0.6))
+plot(precis(m2a))
 mtext("Mdw ID Intercept HGM Models", at = c(-0.2), line = 0.5, font=3)
 dev.off()
 
@@ -742,6 +742,7 @@ dens(post1a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
 dens(post1a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
 dens(post1a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
 dens(post1a$sigma, col="red", show.HPDI = F, add=T, lwd=1, lty=2)
+mtext("Model 1a (NDVI)")
 
 ## Plot Densities M2A
 dens(post2a$a_mdwID, xlim=c(-0.5, 1), 
@@ -753,6 +754,7 @@ dens(post2a$bds, col="tan", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
+mtext("Model 2a (NDWI)")
 
 ## PLOT SIGMAS AGAINST ONE ANOTHER:
 dens(post1a$sigma, col="red2", show.HPDI = T, lwd=1.5, xlim=c(0,0.15))
@@ -770,6 +772,8 @@ Using Meadow ID and HGM category as the intercepts across each HGM type (as a sc
 
 
 ```{r multintercept, eval=T, echo=T}
+
+load("./data_output/models/models_1b_2b_revised.rda")
 
 m1b <- map2stan(
   alist(
@@ -800,7 +804,7 @@ text( 0.1, 22, "Mdw ID" , col=rangi2 )
 text( 0.04 , 15 , "HGM Class" )
 
 #save(m1b,file = "./data_output/models/m1b_revised.rda")
-compare(m1a,m2a, m1b)
+compare(m1a,m2a, m1b,m2b)
 
 m2b <- map2stan(
   alist(
@@ -825,7 +829,7 @@ plot(m2b)
 dev.off()
 
 # SAVE THEM
-save(m1b, m2b, file = "./data_output/models/models_1b_2b_revised.rda")
+# save(m1b, m2b, file = "./data_output/models/models_1b_2b_revised.rda")
 
 
 ## COMPARE ALL
@@ -838,7 +842,7 @@ dens( post2b$sigma_hgm , xlab="sigma", ylim=c(0,22))
 dens( post2b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
 text( 0.1, 22, "Mdw ID" , col=rangi2 )
 text( 0.03 , 16 , "HGM Class" )
-
+mtext("NDWI")
 # Looks like each varies about the same, though Mdw ID appears to have more variation than HGM Class within the model (makes sense).
 
 ```
@@ -943,8 +947,8 @@ rfVI<-as.data.frame(dfVI) %>%
 ## Regular RF
 rfVI.1<-randomForest(mean ~ ., data=rfVI, importance=T)
 rfWI.1<-randomForest(mean ~ ., data=rfWI, importance=T)
-rfVI.1 # model stats
-rfWI.1 # model stats
+rfVI.1 # model stats, NDVI does better job explaining variance for Aug (72%)
+rfWI.1 # model stats, NDWI only explains ~56% of variance
 
 varImpPlot(rfVI.1, pch=21, bg="forestgreen") # var importance plot
 varImpPlot(rfWI.1, pch=21, bg="coral") # var importance plot
@@ -960,16 +964,52 @@ as.data.frame(importance(rfVI.1)) %>%
   arrange(desc(IncNodePurity))
 # So top three are WYI, lat, and flow slope
 
+```
+
+```{r ggRandomForest, eval=T, echo=T}
+#https://arxiv.org/pdf/1501.07196.pdf
 # OK NOW TRY GGRandomForest
-rfWI.2<-rfsrc(mean ~ ., data=rfWI, importance = T)
-plot(gg_vimp(rfWI.2, nvar = 10))
-plot(gg_minimal_depth(rfWI.2))
 
-rfVI.2<-rfsrc(mean ~ ., data=rfVI, importance = T)
-plot(gg_vimp(rfVI.2, nvar = 10))
-plot(gg_minimal_depth(rfVI.2))
+## NDWI
+rfWI.2<-rfsrc(mean ~ ., data=rfWI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
+print(rfWI.2)
+plot(gg_rfsrc(rfWI.2), alpha=.5)
+
+## NDVI
+rfVI.2<-rfsrc(mean ~ ., data=rfVI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
+print(rfVI.2)
+plot(gg_rfsrc(rfVI.2), alpha=.5)
+
+## Look at Minimal Depth, a more quantitave measure of relative importance.
+# Minimal depth assumes that variables with high impact on the
+# prediction are those that most frequently split nodes nearest to the trunks of the trees (i.e. at the root node) where they partition large samples of the population
+
+rfWI_md<-gg_minimal_depth(rfWI.2)
+rfVI_md<-gg_minimal_depth(rfVI.2)
+
+# vertical dashed line indicates max min depth for important vars
+plot(rfWI_md)+ggtitle("NDWI: Quantitative Measure of Importance")
+plot(rfVI_md)+ggtitle("NDVI: Quantitative Measure of Importance")
+
+## Variable Importance:  VIMP
+## Xv is the difference between prediction error when X is noised up by 
+## randomly permuting its values, compared to prediction error under the observed values. NOTE: VIMP is the difference between OOB prediction error before and after permutation, so large VIMP value indicates that misspecification detracts from the variable predictive accuracy in the forest.
+
+# Compare Rankings of VIMP and Min. Depth
+plot(gg_minimal_vimp(rfWI_md))
+
+plot(gg_vimp(rfWI.2, nvar=10)) + ylab("Variable Importance") #+
+  #scale_y_continuous(labels = scales::percent_format(), limits=c(0,1))
+
+plot(gg_vimp(rfVI.2, nvar = 10))+ ylab("Variable Importance")
 
 
+gg_vi<- gg_variable(rfVI.2)
+xvar<- rfVI_md$topvars
+plot(gg_vi, xvar=xvar, panel=TRUE, alpha=.4)+labs(y="NDVI", x="")
+
+
+# vimp(rfWI.2)$importance*100
 # Vertical dashed line indicates the maximal minimal depth
 # for important variables.
 
