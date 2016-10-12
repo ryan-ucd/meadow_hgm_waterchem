@@ -538,7 +538,10 @@ dfWI <- dff %>%
   select(UCDID, mdw_id, WY, month, mean, hgm_class_comb, lf_s:lat_s,
          wyi_s:flowrange_s,LF:Depressional)
 
-save(dff, dfVI, dfWI, file = "./data_output/model_datasets_AUG.rda") 
+# make the datasets the same size for model comparison later:
+dfWI<-dfWI[-sample(nrow(dfVI),13),]
+
+save(dff, dfVI, dfWI, file = "./data_output/model_datasets_Aug_max.rda") 
 
 ```
 
@@ -547,7 +550,7 @@ save(dff, dfVI, dfWI, file = "./data_output/model_datasets_AUG.rda")
 mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 
 # Model Datasets
-load("./data_output/model_datasets_AUG.rda")
+load("./data_output/model_datasets_Aug_max.rda")
 
 # NDVI
 names(dfVI)
@@ -560,6 +563,7 @@ dfWI<-as.data.frame(dfWI)
 dlist1 <- list(
   ndvi=dfVI$mean,
   mdwID=dfVI$mdw_id,
+  WY=(dfVI$WY - mean(dfVI$WY)) / sd(dfVI$WY),
   wyi=dfVI$wyi_s,
   rip=dfVI$rip_s,
   lf=dfVI$lf_s,
@@ -583,6 +587,7 @@ names(dfWI)
 dlist2 <- list(
   ndwi=dfWI$mean,
   mdwID=dfWI$mdw_id,
+  WY=(dfWI$WY - mean(dfWI$WY)) / sd(dfWI$WY),
   wyi=dfWI$wyi_s,
   rip=dfWI$rip_s,
   lf=dfWI$lf_s,
@@ -627,7 +632,11 @@ DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(U
 
 ```
 
-```{r moda_hgm_only, eval=F, echo=T}
+## Single Intercept Model 
+
+Using Meadow ID as the intercept across each HGM type (as a scaled/centered proportion).
+
+```{r mod_hgm_only, eval=F, echo=T}
 
 # START SIMPLE: model of HGM types (proportion per type per meadow)
 # and WY index values
@@ -722,12 +731,13 @@ dens(post2a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
 
-
 ```
 
 ## Multi-level Model
 
 Add different "actor" (so have two variables with changing intercepts). See page 376 in McElreath's book. Nice comparison of the two different sigmas (in this case it would be mdwID and hgm), to show one was stronger than other but including both doesn't add all that much (or detract much) from the model.
+
+Using Meadow ID and HGM category as the intercepts across each HGM type (as a scaled/centered proportion).
 
 
 ```{r multintercept, eval=T, echo=T}
@@ -735,41 +745,72 @@ Add different "actor" (so have two variables with changing intercepts). See page
 m1b <- map2stan(
   alist(
     ndvi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID + a_hgm + bwyi*wyi +
-      belev*elev + bcatch*catcharea + bFslope*flowslope +
-      blat*lat + bkf*kf + bclay + bshape*shape,
+    mu <- a + a_mdwID + a_hgm + bwyi*wyi + 
+      brip*rip + blf*lf + bsub*sub + bds*ds + bdep*dep,
+      #belev*elev + bcatch*catcharea + bFslope*flowslope +
+      #blat*lat + bkf*kf + bclay + bshape*shape,
     a_mdwID[mdwID] ~ dnorm(0, sigma_mdwID),
     a_hgm[hgm] ~ dnorm(0, sigma_hgm),
     a ~ dnorm(0,100),
-    c(a, bwyi, belev, bcatch, 
-      bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    c(a, bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
     sigma ~ cauchy(0,3),
     sigma_mdwID ~ dcauchy(0,1),
     sigma_hgm ~ dcauchy(0,1)
   ),
   data=dlist1, chains = 2, iter=5000, cores=4)
 
-precis(m1b)
-
-plot(m1b)
-
-compare(m1a, m1b)
-
-#       WAIC pWAIC dWAIC weight    SE  dSE
-#m1b -1794.6  26.4   0.0   0.84 89.15   NA
-#m1a -1791.3  27.0   3.3   0.16 88.43 2.27
+precis(m1b, depth=2)
+plot(m1b) # trace plots good
+dev.off()
+plot(precis(m1b, depth=2))
 
 post1b <- extract.samples(m1b)
-dens( post1b$sigma_hgm , xlab="sigma" )
+dens( post1b$sigma_hgm , xlab="sigma" , ylim=c(0,25), xlim=c(0,0.7))
 dens( post1b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
 text( 0.1, 22, "Mdw ID" , col=rangi2 )
-text( 0.03 , 22 , "HGM Class" )
+text( 0.04 , 15 , "HGM Class" )
+
+
+m2b <- map2stan(
+  alist(
+    ndwi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID + a_hgm + bwyi*wyi + 
+      brip*rip + blf*lf + bsub*sub + bds*ds + bdep*dep,
+      #belev*elev + bcatch*catcharea + bFslope*flowslope +
+      #blat*lat + bkf*kf + bclay + bshape*shape,
+    a_mdwID[mdwID] ~ dnorm(0, sigma_mdwID),
+    a_hgm[hgm] ~ dnorm(0, sigma_hgm),
+    a ~ dnorm(0,100),
+    c(a, bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
+    sigma ~ cauchy(0,3),
+    sigma_mdwID ~ dcauchy(0,1),
+    sigma_hgm ~ dcauchy(0,1)
+  ),
+  data=dlist2, chains = 2, iter=5000, cores=4)
+
+precis(m2b)
+plot(precis(m2b, depth=2))
+plot(m2b)
+
+# SAVE THEM
+save(m1b, m2b, file = "./data_output/models_1b_2b_revised.rda")
+
+compare(m1a, m1b)
+compare(m2a, m2b)
+
+post2b <- extract.samples(m2b)
+dens( post2b$sigma_hgm , xlab="sigma", ylim=c(0,22))
+dens( post2b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
+text( 0.1, 22, "Mdw ID" , col=rangi2 )
+text( 0.03 , 16 , "HGM Class" )
 
 # Looks like each varies about the same, though Mdw ID appears to have more variation than HGM Class within the model (makes sense).
 
-
 ```
 
+Adding HGM class (type) as an additional intercept improves the model only marginally. It only techically adds a half parameter and improves the WAIC value by 0.4 or 0.6. Can't compare the NDVI and NDWI models at this point because they have slightly different numbers of observations. Should even the two so I can compare in the future.  
+
+Use `dim(dfWI[-sample(nrow(dfVI),5),])`
 
         
 ```{r modb_hgm_dat, eval=F, echo=T} 
