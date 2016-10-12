@@ -966,7 +966,7 @@ as.data.frame(importance(rfVI.1)) %>%
 
 ```
 
-```{r ggRandomForest, eval=T, echo=T}
+```{r ggRandomForest, eval=F, echo=T}
 #https://arxiv.org/pdf/1501.07196.pdf
 # OK NOW TRY GGRandomForest
 
@@ -1005,28 +1005,18 @@ plot(gg_vimp(rfVI.2, nvar = 10))+ ylab("Variable Importance")
 
 
 gg_vi<- gg_variable(rfVI.2)
-xvar<- rfVI_md$topvars
-plot(gg_vi, xvar=xvar, panel=TRUE, alpha=.4)+labs(y="NDVI", x="")
+xVvar<- rfVI_md$topvars
+plot(gg_vi, xvar=xVvar, panel=TRUE, alpha=.4)+labs(y="NDVI", x="")
 
+gg_wi<- gg_variable(rfWI.2)
+xWvar<- rfWI_md$topvars
+plot(gg_wi, xvar=xWvar, panel=TRUE, alpha=.4)+labs(y="NDWI", x="")
 
 # vimp(rfWI.2)$importance*100
 # Vertical dashed line indicates the maximal minimal depth
 # for important variables.
 
-# Top variables:
-#               depth  vimp
-# wyi_s         1.823 0.007
-# lat_s         3.154 0.005
-# flow_slope_s  3.219 0.005
-# shapearea_s   3.575 0.002
-# edgecomplex_s 3.881 0.002
-# catch_s       3.946 0.003
-# elevmean_s    4.184 0.002
-# flowrange_s   4.581 0.001
-# soilcomp      4.959 0.001
-# claytotR_s    5.605 0.001
-# sub_s         5.757 0.002
-# ----------------------------
-
+# Save stuff
+save(rfWI_md, rfWI.2, rfVI_md, rfVI.2, file = "./data_output/models/rf_models.rda")
 
 ```
