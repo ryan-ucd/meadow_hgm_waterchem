@@ -547,7 +547,7 @@ save(dff, dfVI, dfWI, file = "./data_output/model_datasets_Aug_max.rda")
 
 ```{r load mod datasets, eval=T, echo=F}
 # Full Dataset
-mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
+#mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 
 # Model Datasets
 load("./data_output/model_datasets_Aug_max.rda")
@@ -611,6 +611,8 @@ library(tidyr)
 library(magrittr)
 library(dplyr)
 
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
+
 # Table of Each Meadow and HGM Type for that Meadow
 DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
               rownames = TRUE,
@@ -666,7 +668,7 @@ m2a <- map2stan(
   data=dlist2, chains = 2, iter=5000, cores=4)
 
 # SAVE THEM
-save(m1a, m2a, file = "./data_output/models_1a_1b_revised.rda")
+save(m1a, m2a, file = "./data_output/models/models_1a_2a_revised.rda")
 
 # look at estimates omitting varying effects output
 precis( m1a , depth=2)
@@ -699,11 +701,32 @@ png(filename = "./fig_output/m2a_precis_all.png", width = 9, height = 6.6, units
 plot(precis(m2a, depth=2)) # see full results for each meadow
 mtext("Varying effects model (Mdws) NDWI")
 dev.off()
+```
 
+```{r mod1a2a posteriors}
+
+load(file = "./data_output/models/models_1a_2a_revised.rda")
 compare(m1a, m2a)
-load(file = "./data_output/models_1a_1b_revised.rda")
-#abline(v = 1, col=col.alpha("gray",0.5))
 
+par(mfrow=c(1,2))
+plot(precis(m1a))
+plot(precis(m2a), xlim=c(0,0.6))
+mtext("Mdw ID Intercept HGM Models", at = c(-0.2), line = 0.5, font=3)
+dev.off()
+
+
+# Make Your Own Precis Plot
+# Precis plot/table is the Gaussian approximations for each parameter’s marginal distribution, which means the plausibility of each value of "mu", after  averaging over the plausibilities of each value of sigma, is given by a Gaussian distribution with mean (mu) and standard deviation.
+
+## Make a dataframe of precis output and ggplot
+# df1a<-precis(m1a)@output
+# df1a$vars<-row.names(df1a)
+# row.names(df1a)<-NULL
+# colnames(df1a)[3:4]<-c("lower89", "upper89")
+# df1a
+# ggplot() + geom_pointrange(data=df1a, aes(y=Mean, x=vars, ymax=upper89, ymin=lower89, color=vars), fatten = 4, pch=21, show.legend = F) + coord_flip() + xlab("Model Variables") +
+#   ylab("Model Variance")
+# 
 ## EXTRACT POSTERIORS
 post1a<-extract.samples(m1a)
 post2a<-extract.samples(m2a)
@@ -731,6 +754,12 @@ dens(post2a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
 
+## PLOT SIGMAS AGAINST ONE ANOTHER:
+dens(post1a$sigma, col="red2", show.HPDI = T, lwd=1.5, xlim=c(0,0.15))
+dens(post2a$sigma, col="darkblue", show.HPDI = T, lwd=2, lty=1, add=T)
+text(x=0.05, y=220, labels="NDVI", col="red", family="sans",font=1)
+text(x = 0.12, y=215,labels = expression(paste("NDWI ", sigma," is slightly larger")), family="sans", font=1, col="darkblue")
+
 ```
 
 ## Multi-level Model
@@ -753,7 +782,7 @@ m1b <- map2stan(
     a_hgm[hgm] ~ dnorm(0, sigma_hgm),
     a ~ dnorm(0,100),
     c(a, bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,3),
+    sigma ~ cauchy(0,2.5),
     sigma_mdwID ~ dcauchy(0,1),
     sigma_hgm ~ dcauchy(0,1)
   ),
@@ -762,7 +791,7 @@ m1b <- map2stan(
 precis(m1b, depth=2)
 plot(m1b) # trace plots good
 dev.off()
-plot(precis(m1b, depth=2))
+plot(precis(m1b, depth=1))
 
 post1b <- extract.samples(m1b)
 dens( post1b$sigma_hgm , xlab="sigma" , ylim=c(0,25), xlim=c(0,0.7))
@@ -770,6 +799,8 @@ dens( post1b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
 text( 0.1, 22, "Mdw ID" , col=rangi2 )
 text( 0.04 , 15 , "HGM Class" )
 
+#save(m1b,file = "./data_output/models/m1b_revised.rda")
+compare(m1a,m2a, m1b)
 
 m2b <- map2stan(
   alist(
@@ -782,7 +813,7 @@ m2b <- map2stan(
     a_hgm[hgm] ~ dnorm(0, sigma_hgm),
     a ~ dnorm(0,100),
     c(a, bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,3),
+    sigma ~ cauchy(0,2.5),
     sigma_mdwID ~ dcauchy(0,1),
     sigma_hgm ~ dcauchy(0,1)
   ),
@@ -791,13 +822,17 @@ m2b <- map2stan(
 precis(m2b)
 plot(precis(m2b, depth=2))
 plot(m2b)
+dev.off()
 
 # SAVE THEM
-save(m1b, m2b, file = "./data_output/models_1b_2b_revised.rda")
+save(m1b, m2b, file = "./data_output/models/models_1b_2b_revised.rda")
 
-compare(m1a, m1b)
-compare(m2a, m2b)
 
+## COMPARE ALL
+compare(m1a, m2a) # NDVI
+compare(m1b, m2b) # NDWI
+
+# Extract posteriors
 post2b <- extract.samples(m2b)
 dens( post2b$sigma_hgm , xlab="sigma", ylim=c(0,22))
 dens( post2b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
@@ -810,25 +845,26 @@ text( 0.03 , 16 , "HGM Class" )
 
 Adding HGM class (type) as an additional intercept improves the model only marginally. It only techically adds a half parameter and improves the WAIC value by 0.4 or 0.6. Can't compare the NDVI and NDWI models at this point because they have slightly different numbers of observations. Should even the two so I can compare in the future.  
 
-Use `dim(dfWI[-sample(nrow(dfVI),5),])`
-
         
 ```{r modb_hgm_dat, eval=F, echo=T} 
+
 # Now add some of the meta meadow variables like elev, flowslope, etc.
-m1b <- map2stan(
+m1c <- map2stan(
   alist(
     ndvi ~ dnorm(mu, sigma), 
     mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
       bsub*sub + bds*ds + bdep*dep + 
       belev*elev + bcatch*catcharea + bFslope*flowslope +
       blat*lat + bkf*kf + bclay + bshape*shape,
-    a ~ dnorm(11,100),
-    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    a ~ dnorm(0,100),
+    a_mdwID[mdwID] ~ dnorm(0,sigma),
     c(bwyi, brip, blf, bsub, bds, bdep,
       belev, bcatch, bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2)
+    sigma ~ cauchy(0,2.5)
   ),
-  data=dlist1, chains = 2, iter=5000, cores=2)
+  data=dlist1, chains = 2, iter=5000, cores=4)
+save(m1c, file = "./data_output/models/models_1c_revised.rda")
+
 
 m2b <- map2stan(
   alist(
@@ -845,8 +881,8 @@ m2b <- map2stan(
   ),
   data=dlist2, chains = 2, iter=5000, cores=2)
 
-summary(m1b) # see all 
-plot(m1b) # see trace plots
+summary(m1c) # see all 
+plot(m1c) # see trace plots
 
 par(mfrow=c(1,1))
 plot(precis(m1b)) # see basic results with fixed effects
@@ -860,7 +896,7 @@ save(m2a,m2b, file = "./data_output/models_2a_2b_revised.rda")
 
 # Mixed Effect Model with Varying Intercepts for Different HGM types
 
-```{r, eval=F, echo=F}
+```{r mixedcrazy, eval=F, echo=F}
 
 
 m1b<-map2stan(
@@ -884,49 +920,73 @@ precis( m1a , depth=2,
 ```
 
 
-# BRT Models
+# RandomForests Models
 
-```{r BRT}
+```{r RandomForests}
 
-source("./scripts/functions/brt.functions.R")
+# Model Datasets
+load("./data_output/model_datasets_Aug_max.rda")
 
+library(randomForest)
+library(ggRandomForests)
+library(dplyr)
 
-library(gbm)
-library(dismo)
-
-
-# Build model using code from Elith & Leathwick
 set.seed(33)  # set seed to get repeatable model              
 
-# BRT model: shannon -----
+## Make a data set
+names(dfWI)
+rfWI<- as.data.frame(dfWI) %>% 
+  select(mean, hgm_class_comb:flowrange_s) %>% as.data.frame()
+rfVI<-as.data.frame(dfVI) %>% 
+  select(mean, hgm_class_comb:flowrange_s) %>% as.data.frame()
 
-brtWI<-select(dfWI, mean, hgm_class_comb:flowrange_s)
+## Regular RF
+rfVI.1<-randomForest(mean ~ ., data=rfVI, importance=T)
+rfWI.1<-randomForest(mean ~ ., data=rfWI, importance=T)
+rfVI.1 # model stats
+rfWI.1 # model stats
 
-gbm1a <- gbm.step(data=brtWI,
-                  gbm.x = c(2:21),          
-                  gbm.y = 1, 
-                  family = "gaussian",
-                  tree.complexity = 2,   
-                  learning.rate = 0.005, 
-                  bag.fraction = 0.75,
-                  n.folds=10)   
+varImpPlot(rfVI.1, pch=21, bg="forestgreen") # var importance plot
+varImpPlot(rfWI.1, pch=21, bg="coral") # var importance plot
 
-summary(gbm1a)
+# Get dataframe of Importance NDVI
+as.data.frame(importance(rfVI.1)) %>%
+  mutate(vari=row.names(.)) %>%
+  arrange(desc(IncNodePurity))
 
-# with NA included in model
-topn3 = sum((summary(gbm3a, plotit=FALSE)$rel.inf)>=2)
-topvar3 = as.character(summary(gbm3a, plotit=FALSE)$var[1:topn3])
+# Get dataframe of Importance NDWI
+as.data.frame(importance(rfVI.1)) %>%
+  mutate(vari=row.names(.)) %>%
+  arrange(desc(IncNodePurity))
+# So top three are WYI, lat, and flow slope
 
-par(mar=c(5,12,3,3))
-barplot(rev(summary(gbm3a, plotit=FALSE)$rel.inf[1:topn3]), 
-        horiz = TRUE, col = viridis(topn3), 
-        names = rev(summary(gbm3a, plotit=FALSE)$var[1:topn3]), 
-        xlab = "Relative influence",
-        las=1, 
-        main=paste0("Relative Influence: \nTop ",topn3," Vars, Shannon Index"))
+# OK NOW TRY GGRandomForest
+rfWI.2<-rfsrc(mean ~ ., data=rfWI, importance = T)
+plot(gg_vimp(rfWI.2, nvar = 10))
+plot(gg_minimal_depth(rfWI.2))
 
-# par(mar=c(5,4,2,3),oma=c(1,1,1,1), xpd=TRUE); gbm.plot(gbm3a, n.plots = 12, plot.layout=c(4,3), write.title=FALSE)
+rfVI.2<-rfsrc(mean ~ ., data=rfVI, importance = T)
+plot(gg_vimp(rfVI.2, nvar = 10))
+plot(gg_minimal_depth(rfVI.2))
 
+
+# Vertical dashed line indicates the maximal minimal depth
+# for important variables.
+
+# Top variables:
+#               depth  vimp
+# wyi_s         1.823 0.007
+# lat_s         3.154 0.005
+# flow_slope_s  3.219 0.005
+# shapearea_s   3.575 0.002
+# edgecomplex_s 3.881 0.002
+# catch_s       3.946 0.003
+# elevmean_s    4.184 0.002
+# flowrange_s   4.581 0.001
+# soilcomp      4.959 0.001
+# claytotR_s    5.605 0.001
+# sub_s         5.757 0.002
+# ----------------------------
 
 
 ```
