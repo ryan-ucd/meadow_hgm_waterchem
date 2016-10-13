@@ -563,7 +563,7 @@ dfWI<-as.data.frame(dfWI)
 dlist1 <- list(
   ndvi=dfVI$mean,
   mdwID=dfVI$mdw_id,
-  WY=(dfVI$WY - mean(dfVI$WY)) / sd(dfVI$WY),
+  WY=coerce_index(dfVI$WY),
   wyi=dfVI$wyi_s,
   rip=dfVI$rip_s,
   lf=dfVI$lf_s,
@@ -587,7 +587,8 @@ names(dfWI)
 dlist2 <- list(
   ndwi=dfWI$mean,
   mdwID=dfWI$mdw_id,
-  WY=(dfWI$WY - mean(dfWI$WY)) / sd(dfWI$WY),
+  WY=coerce_index(dfWI$WY),
+  #WY=(dfWI$WY - mean(dfWI$WY)) / sd(dfWI$WY),
   wyi=dfWI$wyi_s,
   rip=dfWI$rip_s,
   lf=dfWI$lf_s,
@@ -638,7 +639,7 @@ DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(U
 
 Using Meadow ID as the intercept across each HGM type (as a scaled/centered proportion).
 
-```{r mod_hgm_only, eval=F, echo=T}
+```{r mod_1a2a_hgm, eval=F, echo=T}
 
 # START SIMPLE: model of HGM types (proportion per type per meadow)
 # and WY index values
@@ -712,7 +713,8 @@ par(mfrow=c(1,2))
 plot(precis(m1a))
 plot(precis(m2a))
 mtext("Mdw ID Intercept HGM Models", at = c(-0.2), line = 0.5, font=3)
-dev.off()
+par(mfrow=c(1,1)) # clear the plots
+#dev.off()
 
 
 # Make Your Own Precis Plot
@@ -771,17 +773,13 @@ Add different "actor" (so have two variables with changing intercepts). See page
 Using Meadow ID and HGM category as the intercepts across each HGM type (as a scaled/centered proportion).
 
 
-```{r multintercept, eval=T, echo=T}
-
-load("./data_output/models/models_1b_2b_revised.rda")
+```{r mod_multi_intercept_hgm_m1b2b, eval=F, echo=T}
 
 m1b <- map2stan(
   alist(
     ndvi ~ dnorm(mu, sigma), 
     mu <- a + a_mdwID + a_hgm + bwyi*wyi + 
       brip*rip + blf*lf + bsub*sub + bds*ds + bdep*dep,
-      #belev*elev + bcatch*catcharea + bFslope*flowslope +
-      #blat*lat + bkf*kf + bclay + bshape*shape,
     a_mdwID[mdwID] ~ dnorm(0, sigma_mdwID),
     a_hgm[hgm] ~ dnorm(0, sigma_hgm),
     a ~ dnorm(0,100),
@@ -792,19 +790,6 @@ m1b <- map2stan(
   ),
   data=dlist1, chains = 2, iter=5000, cores=4)
 
-precis(m1b, depth=2)
-plot(m1b) # trace plots good
-dev.off()
-plot(precis(m1b, depth=1))
-
-post1b <- extract.samples(m1b)
-dens( post1b$sigma_hgm , xlab="sigma" , ylim=c(0,25), xlim=c(0,0.7))
-dens( post1b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
-text( 0.1, 22, "Mdw ID" , col=rangi2 )
-text( 0.04 , 15 , "HGM Class" )
-
-#save(m1b,file = "./data_output/models/m1b_revised.rda")
-compare(m1a,m2a, m1b,m2b)
 
 m2b <- map2stan(
   alist(
@@ -823,14 +808,34 @@ m2b <- map2stan(
   ),
   data=dlist2, chains = 2, iter=5000, cores=4)
 
+# SAVE THEM
+save(m1b, m2b, file = "./data_output/models/models_1b_2b_revised.rda")
+
+
+```
+
+
+```{r m1b2b_posteriors, eval=F, echo=T}
+
+load("./data_output/models/models_1b_2b_revised.rda")
+
+precis(m1b, depth=2)
+#plot(m1b) # trace plots good
+#dev.off()
+plot(precis(m1b, depth=1))
+
+post1b <- extract.samples(m1b)
+dens( post1b$sigma_hgm , xlab="sigma" , ylim=c(0,25), xlim=c(0,0.7))
+dens( post1b$sigma_mdwID , col=rangi2 , lwd=2 , add=TRUE )
+text( 0.1, 22, "Mdw ID" , col=rangi2 )
+text( 0.04 , 15 , "HGM Class" )
+
+compare(m1a,m2a, m1b,m2b)
+
 precis(m2b)
 plot(precis(m2b, depth=2))
-plot(m2b)
-dev.off()
-
-# SAVE THEM
-# save(m1b, m2b, file = "./data_output/models/models_1b_2b_revised.rda")
-
+#plot(m2b)
+#par(mfrow=c(1,1)) # clear the plots
 
 ## COMPARE ALL
 compare(m1a, m2a) # NDVI
@@ -850,58 +855,70 @@ mtext("NDWI")
 Adding HGM class (type) as an additional intercept improves the model only marginally. It only techically adds a half parameter and improves the WAIC value by 0.4 or 0.6. Can't compare the NDVI and NDWI models at this point because they have slightly different numbers of observations. Should even the two so I can compare in the future.  
 
         
-```{r modb_hgm_dat, eval=F, echo=T} 
+```{r mod1c2c_mdw_vars, eval=F, echo=T} 
 
-# Now add some of the meta meadow variables like elev, flowslope, etc.
 m1c <- map2stan(
   alist(
     ndvi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
-      bsub*sub + bds*ds + bdep*dep + 
-      belev*elev + bcatch*catcharea + bFslope*flowslope +
-      blat*lat + bkf*kf + bclay + bshape*shape,
-    a ~ dnorm(0,100),
-    a_mdwID[mdwID] ~ dnorm(0,sigma),
-    c(bwyi, brip, blf, bsub, bds, bdep,
-      belev, bcatch, bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2.5)
-  ),
-  data=dlist1, chains = 2, iter=5000, cores=4)
-save(m1c, file = "./data_output/models/models_1c_revised.rda")
-
-
-m2b <- map2stan(
-  alist(
-    ndwi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
-      bsub*sub + bds*ds + bdep*dep + 
-      belev*elev + bcatch*catcharea + bFslope*flowslope +
-      blat*lat + bkf*kf + bclay + bshape*shape,
-    a ~ dnorm(11,100),
-    a_mdwID[mdwID] ~ dnorm(11,sigma),
-    c(bwyi, brip, blf, bsub, bds, bdep,
-      belev, bcatch, bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    mu <- a + a_WY[WY] + bhgm*hgm + bsub*sub + bds*ds +
+      belev*elev + bcatch*catcharea + 
+      bFslope*flowslope + blat*lat + bkf*kf + bclay*clay + bshape*shape,
+    a_WY[WY] ~ dnorm(0, sigma),
+    a ~ dnorm(0,10),
+    c(a, belev, bhgm, bsub, bds, bcatch, bFslope, 
+      blat, bkf, bclay, bshape) ~ dnorm(0,10),
     sigma ~ cauchy(0,2)
   ),
-  data=dlist2, chains = 2, iter=5000, cores=2)
+  data=dlist1, chains=2, iter=5000, cores=2)
 
 summary(m1c) # see all 
 plot(m1c) # see trace plots
+par(mfrow=c(1,1))
+precis(m1c, depth=2)
+plot(precis(m1c)) # see basic results with fixed effects
+plot(precis(m1c, depth=2)) # see full results for each meadow
+mtext("Varying effects model m1b")
+
+
+unique(dlist1$WY)
+unique(dfVI$WY)
+
+#save(m1c, file = "../data_output/models/models_1c_revised.rda")
+#load("../data_output/models/models_1c_revised.rda")
+
+m1d <- map2stan(
+  alist(
+    ndvi ~ dnorm(mu, sigma), 
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + bsub*sub + bds*ds + 
+      belev*elev + bcatch*catcharea + bFslope*flowslope + blat*lat + 
+      bkf*kf + bclay*clay + bshape*shape,
+    a ~ dnorm(0,10),
+    a_mdwID[mdwID] ~ dnorm(11,sigma),
+    c(bwyi, bsub, bds, belev, bcatch, 
+      bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    sigma ~ cauchy(0,2)
+  ),
+  data=dlist1, chains = 2, iter=5000, cores=2)
+
+
+save(m1c,m2c, file = "../data_output/models_1c_2c_revised.rda")
+
+summary(m1d) # see all 
+plot(m1d) # see trace plots
 
 par(mfrow=c(1,1))
-plot(precis(m1b)) # see basic results with fixed effects
-plot(precis(m1b, depth=2)) # see full results for each meadow
+plot(precis(m1d)) # see basic results with fixed effects
+plot(precis(m1d, depth=2)) # see full results for each meadow
 mtext("Varying effects model m1b")
-postcheck(m1b)
+#postcheck(m1d)
 
-save(m2a,m2b, file = "./data_output/models_2a_2b_revised.rda")
+
 
 ```
 
 # Mixed Effect Model with Varying Intercepts for Different HGM types
 
 ```{r mixedcrazy, eval=F, echo=F}
-
 
 m1b<-map2stan(
   alist(
@@ -913,7 +930,7 @@ m1b<-map2stan(
     sigma_name ~ dcauchy(0,1),
     Rho_name ~ dlkjcorr(2),
     sigma ~ dcauchy(0,1)),
-  data=dlist, iter=1000, chains=2,cores=2)
+  data=dlist1, iter=1000, chains=2,cores=2)
 
 precis( m1a , depth=2,
     pars=c("a","b","sigma_name","Rho_name") )
@@ -926,7 +943,7 @@ precis( m1a , depth=2,
 
 # RandomForests Models
 
-```{r RandomForests}
+```{r RandomForests, eval=F, echo=T}
 
 # Model Datasets
 load("./data_output/model_datasets_Aug_max.rda")
@@ -945,8 +962,8 @@ rfVI<-as.data.frame(dfVI) %>%
   select(mean, hgm_class_comb:flowrange_s) %>% as.data.frame()
 
 ## Regular RF
-rfVI.1<-randomForest(mean ~ ., data=rfVI, importance=T)
-rfWI.1<-randomForest(mean ~ ., data=rfWI, importance=T)
+#rfVI.1<-randomForest(mean ~ ., data=rfVI, importance=T)
+#rfWI.1<-randomForest(mean ~ ., data=rfWI, importance=T)
 rfVI.1 # model stats, NDVI does better job explaining variance for Aug (72%)
 rfWI.1 # model stats, NDWI only explains ~56% of variance
 
@@ -970,13 +987,19 @@ as.data.frame(importance(rfVI.1)) %>%
 #https://arxiv.org/pdf/1501.07196.pdf
 # OK NOW TRY GGRandomForest
 
+load("./data_output/models/rf_models.rda")
+
+library(randomForest)
+library(ggRandomForests)
+library(dplyr)
+
 ## NDWI
-rfWI.2<-rfsrc(mean ~ ., data=rfWI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
+#rfWI.2<-rfsrc(mean ~ ., data=rfWI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
 print(rfWI.2)
 plot(gg_rfsrc(rfWI.2), alpha=.5)
 
 ## NDVI
-rfVI.2<-rfsrc(mean ~ ., data=rfVI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
+#rfVI.2<-rfsrc(mean ~ ., data=rfVI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
 print(rfVI.2)
 plot(gg_rfsrc(rfVI.2), alpha=.5)
 
@@ -984,8 +1007,8 @@ plot(gg_rfsrc(rfVI.2), alpha=.5)
 # Minimal depth assumes that variables with high impact on the
 # prediction are those that most frequently split nodes nearest to the trunks of the trees (i.e. at the root node) where they partition large samples of the population
 
-rfWI_md<-gg_minimal_depth(rfWI.2)
-rfVI_md<-gg_minimal_depth(rfVI.2)
+#rfWI_md<-gg_minimal_depth(rfWI.2)
+#rfVI_md<-gg_minimal_depth(rfVI.2)
 
 # vertical dashed line indicates max min depth for important vars
 plot(rfWI_md)+ggtitle("NDWI: Quantitative Measure of Importance")
@@ -998,10 +1021,10 @@ plot(rfVI_md)+ggtitle("NDVI: Quantitative Measure of Importance")
 # Compare Rankings of VIMP and Min. Depth
 plot(gg_minimal_vimp(rfWI_md))
 
-plot(gg_vimp(rfWI.2, nvar=10)) + ylab("Variable Importance") #+
+plot(gg_vimp(rfWI.2, nvar=10)) + ylab("NDWI Variable Importance") #+
   #scale_y_continuous(labels = scales::percent_format(), limits=c(0,1))
 
-plot(gg_vimp(rfVI.2, nvar = 10))+ ylab("Variable Importance")
+plot(gg_vimp(rfVI.2, nvar = 10))+ ylab("NDVI Variable Importance")
 
 
 gg_vi<- gg_variable(rfVI.2)
@@ -1017,6 +1040,6 @@ plot(gg_wi, xvar=xWvar, panel=TRUE, alpha=.4)+labs(y="NDWI", x="")
 # for important variables.
 
 # Save stuff
-save(rfWI_md, rfWI.2, rfVI_md, rfVI.2, file = "./data_output/models/rf_models.rda")
+#save(rfWI_md, rfWI.2, rfVI_md, rfVI.2, file = "./data_output/models/rf_models.rda")
 
 ```
