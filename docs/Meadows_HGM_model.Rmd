@@ -550,11 +550,11 @@ save(dff, dfVI, dfWI, file = "./data_output/model_datasets_Aug_max.rda")
 #mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 
 # Model Datasets
-load("./data_output/model_datasets_Aug_max.rda")
+load("../data_output/model_datasets_Aug_max.rda")
 
 # NDVI
 names(dfVI)
-summary(dfVI)
+#summary(dfVI)
 
 dfVI<-as.data.frame(dfVI)
 dfWI<-as.data.frame(dfWI)
@@ -612,7 +612,7 @@ library(tidyr)
 library(magrittr)
 library(dplyr)
 
-mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
+mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds")
 
 # Table of Each Meadow and HGM Type for that Meadow
 DT::datatable(mod.hgm %>% dplyr::distinct(PLOTNAME2, .keep_all = T) %>% select(UCDID,PLOTNAME2, hgm_type, hgm_class_comb), 
@@ -649,10 +649,10 @@ m1a <- map2stan(
     ndvi ~ dnorm(mu, sigma), 
     mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
       bsub*sub + bds*ds + bdep*dep,
-    a ~ dnorm(0,100),
+    a ~ dnorm(0,10),
     a_mdwID[mdwID] ~ dnorm(0,sigma),
     c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,3)
+    sigma ~ cauchy(0,2)
   ),
   data=dlist1, chains = 2, iter=5000, cores=4)
 
@@ -661,15 +661,15 @@ m2a <- map2stan(
     ndwi ~ dnorm(mu, sigma), 
     mu <- a + a_mdwID[mdwID] + bwyi*wyi + brip*rip + blf*lf + 
       bsub*sub + bds*ds + bdep*dep,
-    a ~ dnorm(0,100),
+    a ~ dnorm(0,10),
     a_mdwID[mdwID] ~ dnorm(0,sigma),
     c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,3)
+    sigma ~ cauchy(0,2)
   ),
   data=dlist2, chains = 2, iter=5000, cores=4)
 
 # SAVE THEM
-save(m1a, m2a, file = "./data_output/models/models_1a_2a_revised.rda")
+save(m1a, m2a, file = "../data_output/models/models_1a_2a_revised.rda")
 
 # look at estimates omitting varying effects output
 precis( m1a , depth=2)
@@ -682,39 +682,45 @@ plot(m2a) # see trace plots, look good.
 par(mfrow=c(1,1)) # clear the plots
 
 ## MOD 1A
-png(filename = "./fig_output/m1a_precis.png", width = 9, height = 6.6, units = "in", res = 200)
+png(filename = "../fig_output/m1a_precis.png", width = 9, height = 6.6, units = "in", res = 200)
 plot(precis(m1a)) # see basic results with fixed effects
 mtext("Varying effects (Mdws) model NDVI")
 dev.off()
 
-png(filename = "./fig_output/m1a_precis_all.png", width = 9, height = 6.6, units = "in", res = 200)
+png(filename = "../fig_output/m1a_precis_all.png", width = 9, height = 6.6, units = "in", res = 200)
 plot(precis(m1a, depth=2)) # see full results for each meadow
 mtext("Varying effects model (Mdws) NDVI")
 dev.off()
 
 ## MOD 2A
-png(filename = "./fig_output/m2a_precis.png", width = 9, height = 6.6, units = "in", res = 200)
+png(filename = "../fig_output/m2a_precis.png", width = 9, height = 6.6, units = "in", res = 200)
 plot(precis(m2a)) # see basic results with fixed effects
 mtext("Varying effects (Mdws) model NDWI")
 dev.off()
 
-png(filename = "./fig_output/m2a_precis_all.png", width = 9, height = 6.6, units = "in", res = 200)
+png(filename = "../fig_output/m2a_precis_all.png", width = 9, height = 6.6, units = "in", res = 200)
 plot(precis(m2a, depth=2)) # see full results for each meadow
 mtext("Varying effects model (Mdws) NDWI")
 dev.off()
 ```
+![m1a_precis_all](../fig_output/m1a_ndvi_precis_all.png)
 
+![m2a_precis_all](../fig_output/m2a_ndwi_precis_all.png)
 ```{r mod1a2a posteriors}
 
-load(file = "./data_output/models/models_1a_2a_revised.rda")
+load(file = "../data_output/models/models_1a_2a_revised.rda")
 compare(m1a, m2a)
 
+png("./fig_output/m1a_m2a_precis_plots_simple.png", width = 10, height = 8, units = "in", res = 200)
 par(mfrow=c(1,2))
 plot(precis(m1a))
+mtext("NDVI")
 plot(precis(m2a))
-mtext("Mdw ID Intercept HGM Models", at = c(-0.2), line = 0.5, font=3)
-par(mfrow=c(1,1)) # clear the plots
-#dev.off()
+mtext("NDWI")
+mtext("Mdw ID Intercept HGM Models", at = c(-0.2), line = 1, font=3)
+dev.off()
+
+# par(mfrow=c(1,1)) # clear the plots
 
 
 # Make Your Own Precis Plot
@@ -726,37 +732,48 @@ par(mfrow=c(1,1)) # clear the plots
 # row.names(df1a)<-NULL
 # colnames(df1a)[3:4]<-c("lower89", "upper89")
 # df1a
-# ggplot() + geom_pointrange(data=df1a, aes(y=Mean, x=vars, ymax=upper89, ymin=lower89, color=vars), fatten = 4, pch=21, show.legend = F) + coord_flip() + xlab("Model Variables") +
-#   ylab("Model Variance")
-# 
+# ggplot() + geom_pointrange(data=df1a, aes(y=Mean, x=vars, ymax=upper89, ymin=lower89, color=vars), fatten = 4, pch=21, show.legend = F) +
+#   coord_flip() + xlab("Model Variables") + ylab("Model Variance")
+
 ## EXTRACT POSTERIORS
 post1a<-extract.samples(m1a)
 post2a<-extract.samples(m2a)
 
 ## Plot Densities M1A
+png(filename = "./fig_output/density_m1a.png", width = 10, height = 8, units = "in", res = 200)
+
 dens(post1a$a_mdwID, xlim=c(-0.5, 1), 
      ylim=c(0,20), lty=2, show.HPDI = T)
-#dens(post1a$a, col="red", show.HPDI = F, add=T, lwd=1.5)
-#dens(post1a$bwyi, col="forestgreen", show.HPDI = T, add=T)
+# dens(post1a$bwyi, col="yellow2", show.HPDI = F, add=T)
 dens(post1a$brip, col="green", show.HPDI = T, lwd=1.5, add=T)
-dens(post1a$bds, col="tan", show.HPDI = F, lwd=1.5, add=T)
+dens(post1a$bds, col="brown", show.HPDI = F, lwd=2, add=T)
+text(labels = "Discharge Slope", x = 0.35, y=3, col="brown")
 dens(post1a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
 dens(post1a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
 dens(post1a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
-dens(post1a$sigma, col="red", show.HPDI = F, add=T, lwd=1, lty=2)
+text(labels = "Subsurface", x = 0.2, y=10, col="purple")
+#dens(post1a$sigma, col="red", show.HPDI = F, add=T, lwd=1, lty=2)
 mtext("Model 1a (NDVI)")
+dev.off()
+
 
 ## Plot Densities M2A
+
+png(filename = "./fig_output/density_m2a_NDWI.png", width = 10, height = 8, units = "in", res = 200)
 dens(post2a$a_mdwID, xlim=c(-0.5, 1), 
      ylim=c(0,12), lty=2, show.HPDI = T)
 #dens(post1a$a, col="red", show.HPDI = F, add=T, lwd=1.5)
 #dens(post1a$bwyi, col="forestgreen", show.HPDI = T, add=T)
 dens(post2a$brip, col="green", show.HPDI = T, lwd=1.5, add=T)
-dens(post2a$bds, col="tan", show.HPDI = F, lwd=1.5, add=T)
+dens(post2a$bds, col="brown", show.HPDI = F, lwd=2, add=T)
 dens(post2a$bdep, col="darkblue", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$blf, col="coral2", show.HPDI = F, lwd=1.5, add=T)
 dens(post2a$bsub, col="purple", show.HPDI = F, add=T, lwd=3)
+text(labels = "Subsurface", x = 0.2, y=6, col="purple")
+text(labels = "Discharge Slope", x = 0.35, y=3.5, col="brown")
 mtext("Model 2a (NDWI)")
+dev.off()
+
 
 ## PLOT SIGMAS AGAINST ONE ANOTHER:
 dens(post1a$sigma, col="red2", show.HPDI = T, lwd=1.5, xlim=c(0,0.15))
@@ -766,6 +783,8 @@ text(x = 0.12, y=215,labels = expression(paste("NDWI ", sigma," is slightly larg
 
 ```
 
+![m1a2a_simple](../fig_output/m1a_m2a_precis_plots_simple.png)
+
 ## Multi-level Model
 
 Add different "actor" (so have two variables with changing intercepts). See page 376 in McElreath's book. Nice comparison of the two different sigmas (in this case it would be mdwID and hgm), to show one was stronger than other but including both doesn't add all that much (or detract much) from the model.
@@ -773,44 +792,33 @@ Add different "actor" (so have two variables with changing intercepts). See page
 Using Meadow ID and HGM category as the intercepts across each HGM type (as a scaled/centered proportion).
 
 
-```{r mod_multi_intercept_hgm_m1b2b, eval=F, echo=T}
+```{r mod_all_dat_hgm_m1b, eval=F, echo=T}
 
 m1b <- map2stan(
   alist(
     ndvi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID + a_hgm + bwyi*wyi + 
-      brip*rip + blf*lf + bsub*sub + bds*ds + bdep*dep,
-    a_mdwID[mdwID] ~ dnorm(0, sigma_mdwID),
-    a_hgm[hgm] ~ dnorm(0, sigma_hgm),
-    a ~ dnorm(0,100),
-    c(a, bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2.5),
-    sigma_mdwID ~ dcauchy(0,1),
-    sigma_hgm ~ dcauchy(0,1)
+    mu <- a + a_mdwID[mdwID] + bwyi*wyi + 
+      brip*rip + blf*lf + bsub*sub + bds*ds + bdep*dep +
+      belev*elev + bcatch*catcharea + bFslope*flowslope +
+      blat*lat + bkf*kf + bclay*clay + bshape*shape,
+    a_mdwID[mdwID] ~ dnorm(0, sigma),
+    a ~ dnorm(0,10),
+    c(a, bwyi, brip, bsub, bds, bdep, blf, belev,
+      bcatch, bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    sigma ~ cauchy(0,2)
   ),
   data=dlist1, chains = 2, iter=5000, cores=4)
 
 
-m2b <- map2stan(
-  alist(
-    ndwi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID + a_hgm + bwyi*wyi + 
-      brip*rip + blf*lf + bsub*sub + bds*ds + bdep*dep,
-      #belev*elev + bcatch*catcharea + bFslope*flowslope +
-      #blat*lat + bkf*kf + bclay + bshape*shape,
-    a_mdwID[mdwID] ~ dnorm(0, sigma_mdwID),
-    a_hgm[hgm] ~ dnorm(0, sigma_hgm),
-    a ~ dnorm(0,100),
-    c(a, bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2.5),
-    sigma_mdwID ~ dcauchy(0,1),
-    sigma_hgm ~ dcauchy(0,1)
-  ),
-  data=dlist2, chains = 2, iter=5000, cores=4)
-
 # SAVE THEM
-save(m1b, m2b, file = "./data_output/models/models_1b_2b_revised.rda")
+save(m1b, file = "../data_output/models/models_1b_revised.rda")
 
+summary(m1b)
+#plot(m1b)
+plot(precis(m1b, depth=2))
+# save(m1b, file = "./data_output/models/models_1a_2a_revised.rda")
+
+compare(m1a, m1b)
 
 ```
 
@@ -855,7 +863,9 @@ mtext("NDWI")
 Adding HGM class (type) as an additional intercept improves the model only marginally. It only techically adds a half parameter and improves the WAIC value by 0.4 or 0.6. Can't compare the NDVI and NDWI models at this point because they have slightly different numbers of observations. Should even the two so I can compare in the future.  
 
         
-```{r mod1c2c_mdw_vars, eval=F, echo=T} 
+```{r mod1c2c_WY and mdwVars, eval=F, echo=T} 
+
+load("./data_output/models/models_1c_2c_revised.rda")
 
 m1c <- map2stan(
   alist(

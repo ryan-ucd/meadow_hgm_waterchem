@@ -1,0 +1,405 @@
+---
+title: "Make Climate GIFs"
+author: "Ryan Peek"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_notebook:
+    highlight: pygments
+    theme: readable
+---
+
+# Making Looped GIFs of Climate Data
+
+The goal of this is to demonstrate how to take snow or LANDSAT data and loop through to create GIFs of these plots through time.
+
+## First Get Data
+
+```{r libraries}
+
+library(sharpshootR)  # CDEC.snow.courses, CDECquery, CDECsnowQuery
+library(ggplot2)
+library(dplyr)
+library(viridis)
+library(scales)
+library(cowplot)
+library(stringr)
+library(readr)
+
+```
+
+```{r getsnowdata, eval=F, echo=T}
+
+data(CDEC.snow.courses) # load CDEC data
+snw<-CDEC.snow.courses
+head(snw)
+snw$id<-as.factor(snw$id)
+snw$latitude<-as.numeric(snw$latitude)
+snw$longitude<-as.numeric(snw$longitude)*-1
+snw$apr1avg_in<-snw$april.1.Avg.inches
+snw<-select(snw, course_number, id, elev_feet:longitude,apr1avg_in)
+str(snw)
+
+# CDEC snow data, historical to now for all Stations
+snowhist<-read_csv("../data/snow/cdec_all_snow.csv")
+head(snowhist)
+snowhist$Datetime<-lubridate::mdy(snowhist$Datetime)
+snowhist$Snow<-as.numeric(snowhist$Snow)
+snowhist<-select(snowhist, Snow:Measure,Datetime:Month)
+dfsnw<-left_join(snowhist, snw, by = c("Station"="id"))
+dfsnw$Station<-as.factor(dfsnw$Station)
+dfsnw$Measure<-as.factor(dfsnw$Measure)
+summary(dfsnw)
+
+snw.dat <- dfsnw %>% 
+  filter(!is.na(Snow), 
+         !is.na(latitude),
+         !is.na(apr1avg_in))
+summary(snw.dat)
+
+write_rds(snw.dat, path="../data_output/cdec_snow_hist_all.rds")
+
+```
+
+Once data has been downloaded and joined with the Station ID, we then need to merge with the **Meadow** dataset. To do this requires calculating the nearest distance between spatial points using the `rgeos` package.
+
+```{r joinmdws w snow stations}
+
+snw.dat<-read_rds("../data_output/cdec_snow_hist_all.rds")
+
+# filter to single measurement type
+snw.df<-filter(snw.dat, Measure=="SNOW WC (INCHES)", Year>1983, Month>=1, Month<7) %>%
+  group_by(course_number,Station, Year,latitude,longitude) %>% 
+  summarize(snow_cm=2.54*mean(Snow,na.rm=T),
+            snow_in=mean(Snow,na.rm=T)) %>% 
+  as.data.frame()
+
+head(snw.df)
+table(snw.df$Year)
+
+# Now use these packages to make spatial and calculate nearest distances
+library(sp)
+library(rgeos)
+
+# make a spatial df w distinct station IDs
+snw.stations <- snw.df %>% distinct(Station, .keep_all = T) %>% select(course_number:Station, latitude:snow_in) %>% as.data.frame
+snw.sp <- snw.df %>% distinct(Station, .keep_all = T) %>% as.data.frame
+coordinates(snw.sp) <- ~longitude+latitude # make spatial
+class(snw.sp) # check type of spatial data frame
+
+# calculate distances between each of snow station points
+d <- gDistance(snw.sp,byid = T)
+str(d)
+
+# calculate the second shortest distance (closest distance is of point to itself, therefore use second shortest)
+min.d <- apply(d, 1, function(x) order(x, decreasing=F)[2])
+str(min.d)
+
+# make new dataframe
+newdata <- cbind(snw.stations, snw.stations[min.d,], apply(d, 1, function(x) sort(x, decreasing=F)[2]))
+
+head(newdata)
+colnames(newdata) <- c(colnames(snw.stations), 'neighbor_course','n_id', 'n.lat', 'n.long', 'n.snow_cm', 'n.snow_in', 'distance')
+h(newdata)
+
+# NOW NEED TO MERGE WITH MEADOWS
+mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds")
+
+dfMDW<-mod.hgm %>% dplyr::distinct(UCDID, .keep_all = T) %>% 
+  select(PLOT, UCDID, LAT_DD, LONG_DD, HUC12)
+names(dfMDW)[3:4]<-c('latitude','longitude')
+names(dfMDW)
+
+# df2 = snow
+dfSNW<-select(snw.stations, course_number:longitude)
+head(dfSNW)
+
+# promote the input lists to SpatialPointsDataFrames
+coordinates(dfMDW) <- c("longitude", "latitude")
+coordinates(dfSNW) <- c("longitude", "latitude")             
+
+#  Define these vectors, used in the loop.
+closestSiteVec <- vector(mode = "numeric",length = nrow(dfMDW))
+minDistVec     <- vector(mode = "numeric",length = nrow(dfMDW))
+
+# Get the vector index of the data closest to each Locations of interest.
+# spDistsN1 usage: spDistsN1(pointList, pointToMatch, longlat)
+# where:  pointList   : List of candidate points, pointToMatch: Single point for which we seek the closest point in pointList.
+# longlat     : TRUE  computes Great Circle distance in km, FALSE computes Euclidean distance in units of input geographic coordinates
+
+# run loop                       
+for (i in 1 : nrow(dfMDW))
+{
+  distVec <- spDistsN1(dfSNW,dfMDW[i,],longlat = TRUE)
+  minDistVec[i] <- min(distVec)
+  closestSiteVec[i] <- which.min(distVec)
+}
+
+# make dataframe
+PointAssign <- as.data.frame(dfSNW[closestSiteVec,c(1:2)])
+mdw_snow.df = data.frame(coordinates(dfMDW),dfMDW$PLOT,dfMDW$UCDID,dfMDW$HUC12,
+                        closestSiteVec,minDistVec,PointAssign)
+# Update column names 
+names(mdw_snow.df) <- c("long","lat","PLOT","UCDID","HUC12","closestSNOTEL_ID", "Distance","course_number", "Station","snw_long","snw_lat")
+
+head(mdw_snow.df)
+
+# write out
+write_csv(mdw_snow.df,path="../data_output/cdec_snw_mdw_merge.csv")
+write_rds(mdw_snow.df,path = "../data_output/cdec_snw_mdw_merge.rds")
+save(mdw_snow.df,file = "../data_output/cdec_snw_mdw_merge.rda")
+
+rm(d,CDEC.snow.courses,PointAssign, dfMDW, dfSNW, closestSiteVec, distVec, min.d, minDistVec, snow.sp, snw.sp)
+
+```
+
+## Plot A Google Map with Joined Data
+
+```{r MakeBasePlot, fig.align="center"}
+
+## Load Data
+cdec.snow.mdw<-read_rds("./data_output/cdec_snw_mdw_merge.rds")
+snow.dat<-read_rds("./data_output/cdec_snow_hist_all.rds")
+#mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds") # full model dataset
+#load("../data_output/model_datasets_Aug_max.rda")
+
+# filter to single measurement type & join with cdec.snow.mdw
+snow.df<-filter(snow.dat, Measure=="SNOW WC (INCHES)", Month>=1) %>%
+  group_by(course_number,Station, Year,latitude,longitude) %>% 
+  summarize(snow_cm=2.54*mean(Snow,na.rm=T),
+            snow_in=mean(Snow,na.rm=T)) %>% 
+  as.data.frame()
+
+snow.hgm.df<-inner_join(snow.df, cdec.snow.mdw, by="Station") %>% 
+  rename("course_number"=course_number.x) %>% 
+  select(-course_number.y)
+  
+summary(snow.hgm.df)
+table(snow.hgm.df$Year) # Nearly every meadow has data....could plot for each Month if necessary
+
+## Set the SNOW Palettes
+library(RColorBrewer)
+breaks<-(c(0,25,50,75,100,125,150,175,200)) # for color scale
+palette<-c("darkred","red4","red2","lightcoral","lightpink","limegreen","green2","forestgreen")
+paletteBlu<-brewer.pal(9,name="Blues")
+paletteGnBu<-brewer.pal(9,name="GnBu")
+paletteRdBu<-brewer.pal(9,name="RdBu")
+
+
+library(googleVis)
+library(ggmap)
+
+# Get the basemap
+ca <- get_map(
+  #location='california',
+  c(lon=-120,lat=38.7),
+  zoom=7,crop=T,
+  scale="auto",color="bw",source="google",
+  maptype="terrain") # can change to terrain
+
+gg <- ggmap(ca, extent='device',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
+gg
+
+# PLOT SIMPLE
+ggCA <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==1984,], 
+                        aes(x=longitude, y=latitude, size=snow_cm),
+                        show.legend=T, pch=21, color="gray30",
+                        fill="blue2", alpha=0.6)+
+  theme_bw() + facet_wrap(~Year, ncol=1)
+print(ggCA) 
+
+# WITH PALETTE
+ggSnw <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==2013,], 
+                        aes(x=longitude, y=latitude,size=snow_cm*1.2, fill=snow_cm),
+                        show.legend=F, pch=21)+ 
+  theme_bw() + ylab("Latitude") + xlab("Longitude") +
+  theme(legend.position=c(1,1),legend.justification=c(1,1),
+        legend.direction="vertical",legend.text=element_text(size=8),
+        legend.title=element_text(size=8, face="bold"),
+        legend.box="horizontal",
+        legend.box.just = c("top"), 
+        legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
+  scale_fill_gradientn("Snow Depth (cm)",colours=paletteRdBu,
+                       breaks=breaks,values=breaks, rescaler = function(x, ...) x, 
+                       oob = identity,limits=range(breaks), space="Lab")+
+  facet_wrap(~Year, ncol = 1)
+
+print(ggSnw)
+
+```
+
+## NOW SIMPLE LOOP!
+
+Use a loop to create PNGs.
+
+```{r make a loop, eval=F, echo=T}
+
+# i<-2011
+# table(snow.hgm.df$Year)
+
+for (i in c(1930:max(snow.hgm.df$Year))){
+  gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==i,], 
+                        aes(x=longitude, y=latitude, size=snow_cm*1.2, fill=snow_cm),
+                  show.legend=F, pch=21, color="gray30")+ 
+    theme_bw() + ylab("Latitude") + xlab("Longitude") +
+    theme(axis.text.x = element_text(angle = 60, vjust=0.15, size=8),
+          legend.position=c(1,1),legend.justification=c(1,1),
+          legend.direction="vertical",legend.text=element_text(size=8),
+          legend.title=element_text(size=8, face="bold"),
+          legend.box="horizontal",
+          legend.box.just = c("top"), 
+          legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
+    scale_fill_gradientn("Snow Depth (cm)",
+                         colours=brewer.pal(8,name="RdBu"), 
+                         limits=range(breaks), breaks=breaks)+
+    # scale_fill_gradientn("Snow Depth (cm)",colours=paletteRdBu,
+    #                     breaks=breaks,values=breaks, rescaler = function(x, ...) x,
+    #                     oob = identity,limits=range(breaks), space="Lab")+
+    facet_wrap(~Year, ncol = 1)
+    print(paste0("saving plot ", i))
+    ggsave(filename = paste0("../fig_output/cdec/hgm_snowcdec_",i,".png"),
+           width = 11,height=8.5,dpi = 150)
+}
+
+
+```
+
+## Now Loop + Animate!
+
+This uses the `purrr` package to map over a ggplot function and build pngs. 
+
+```{r cdec snow animation}
+
+library(purrr)
+library(magick)
+library(RColorBrewer)
+library(googleVis)
+library(ggmap)
+
+# Get the basemap
+ca <- get_map(
+  #location='california',
+  c(lon=-120,lat=38.7),
+  zoom=7,crop=T,
+  scale="auto",color="bw",source="google",
+  maptype="terrain") # can change to terrain
+
+gg <- ggmap(ca, extent='panel',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
+#gg
+
+cdec_map <- function(Yr){
+  
+  gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==Yr,], 
+                        aes(x=longitude, y=latitude, size=snow_cm*1.2, fill=snow_cm),
+                  show.legend=F, pch=21, color="gray30")+ 
+    theme_bw() + ylab("Latitude") + xlab("Longitude") +
+    theme(axis.text.x = element_text(angle = 60, vjust=0.15, size=8),
+          legend.position=c(1,1),legend.justification=c(1,1),
+          legend.direction="vertical",legend.text=element_text(size=8),
+          legend.title=element_text(size=8, face="bold"),
+          legend.box="horizontal",
+          legend.box.just = c("top"), 
+          legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
+    scale_fill_gradientn("Snow Depth (cm)",
+                         colours=brewer.pal(8,name="RdBu"), 
+                         limits=range(breaks), breaks=breaks)+
+    # scale_fill_gradientn("Snow Depth (cm)",colours=paletteRdBu,
+    #                     breaks=breaks,values=breaks, rescaler = function(x, ...) x,
+    #                     oob = identity,limits=range(breaks), space="Lab")+
+    facet_wrap(~Year, ncol = 1)
+    print(paste0("saving plot ", Yr))
+    ggsave(filename = paste0("./fig_output/cdec/hgm_snowcdec_",Yr,".png"),
+           width = 8, height=8, units = "in",dpi = 150)
+}
+  
+# Step 1: Make Plots For Year Range 
+seq(from = 1984, to=2015, by=1) %>% 
+  map(cdec_map)
+
+# Step 2: List those Plots, Read them in, and then make animation
+list.files(path = "./fig_output/cdec/", pattern = "*.png", full.names = T) %>% 
+  map(image_read) %>% # reads each path file
+  image_join() %>% # joins image
+  image_animate(fps=4) %>% # animates, can opt for number of loops
+  image_write("./fig_output/cdec_snow.gif") # write to current dir
+
+```
+
+```{r ndvi animation}
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds") # full model dataset
+mod.hgm$month<-lubridate::month(mod.hgm$date)
+ndvi.df <- mod.hgm %>% 
+  group_by(UCDID, WY, month) %>% 
+  filter(index=="NDVI", month==8, mean==max(mean, na.rm=T)) %>%
+  select(UCDID, WY, month, mean, median, stdDev, hgm_class_comb, LF:Depressional, LAT_DD, LONG_DD)
+
+#load("../data_output/model_datasets_Aug_max.rda") # data
+
+## Set the NDVI Palette
+breaks<-(c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8)) # for color scale
+palette<-c("darkred","red4","red2","lightcoral","lightpink","limegreen","green2","forestgreen")
+
+# Get the basemap
+ca <- get_map(
+  #location='california',
+  c(lon=-120,lat=38.7),
+  zoom=7,crop=T,
+  scale="auto",color="bw",source="google",
+  maptype="terrain") # can change to terrain
+
+gg <- ggmap(ca, extent='device',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
+
+ndvi_map <- function(Yr){
+  
+  gg + geom_point(data=ndvi.df[ndvi.df$WY==Yr,], 
+                        aes(x=LONG_DD, y=LAT_DD, fill=mean),
+                  show.legend=F, pch=21, size=4.4, color="gray30")+ 
+    theme_bw() + ylab("Latitude") + xlab("Longitude") +
+    theme(axis.text.x = element_text(angle = 60, vjust=0.15, size=8),
+          legend.position=c(1,1),legend.justification=c(1,1),
+          legend.direction="vertical",legend.text=element_text(size=8),
+          legend.title=element_text(size=8, face="bold"),
+          legend.box="horizontal",
+          legend.box.just = c("top"), 
+          legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
+    # scale_fill_gradientn("NDVI (Aug)",
+                         # colours=brewer.pal(8,name="RdYlGn"), 
+                         # limits=range(breaks), breaks=breaks)+
+    scale_fill_gradientn("NDVI (Aug)",colours=palette,
+                         breaks=breaks,values=breaks, rescaler = function(x, ...) x,
+                         oob = identity,limits=range(breaks), space="Lab")+
+    facet_wrap(~WY, ncol = 1)
+    print(paste0("saving plot ", Yr))
+    ggsave(filename = paste0("./fig_output/ndvi/hgm_ndvi_",Yr,".png"),
+           width = 8,height=8,dpi = 150)
+}
+  
+# Step 1: Make Plots For Year Range 
+seq(from = 1984, to=2015, by=1) %>% 
+  map(ndvi_map)
+
+
+# Step 2: List those Plots, Read them in, and then make animation
+list.files(path = "./fig_output/ndvi/", pattern = "*.png", full.names = T) %>% 
+  map(image_read) %>% # reads each path file
+  image_join() %>% # joins image
+  image_animate(fps=4) %>% # animates, can opt for number of loops
+  image_write("ndvi_aug_hgm.gif") # write to current dir
+
+```
+
+```{r animation w systemImageMagick}
+
+## Using ImageMagick: Set working dir first to images
+system(command= "convert ~/Documents/github/meadow_hgm_waterchem/fig_output/cdec/*.png -delay 80 -loop 0 cdec_snow_IM.gif")
+# play with -delay as necessary, this is much faster than the fps in "magick"
+
+# To Resize Use
+system(command= "convert -size 1100x850 cdec_snow.gif -resize 800x600 cdec_snow_small.gif")
+
+## Remove pngs if you want to save space
+#file.remove(list.files(pattern=".png"))
+
+
+```
+
+
