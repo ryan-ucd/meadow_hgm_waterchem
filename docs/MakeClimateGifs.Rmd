@@ -157,8 +157,8 @@ rm(d,CDEC.snow.courses,PointAssign, dfMDW, dfSNW, closestSiteVec, distVec, min.d
 ```{r MakeBasePlot, fig.align="center"}
 
 ## Load Data
-cdec.snow.mdw<-read_rds("./data_output/cdec_snw_mdw_merge.rds")
-snow.dat<-read_rds("./data_output/cdec_snow_hist_all.rds")
+cdec.snow.mdw<-read_rds("../data_output/cdec_snw_mdw_merge.rds")
+snow.dat<-read_rds("../data_output/cdec_snow_hist_all.rds")
 #mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds") # full model dataset
 #load("../data_output/model_datasets_Aug_max.rda")
 
@@ -196,30 +196,33 @@ ca <- get_map(
   scale="auto",color="bw",source="google",
   maptype="terrain") # can change to terrain
 
-gg <- ggmap(ca, extent='device',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
-gg
+gg <- ggmap(ca, extent='panel',padding=0) 
 
-# PLOT SIMPLE
-ggCA <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==1984,], 
-                        aes(x=longitude, y=latitude, size=snow_cm),
-                        show.legend=T, pch=21, color="gray30",
-                        fill="blue2", alpha=0.6)+
-  theme_bw() + facet_wrap(~Year, ncol=1)
-print(ggCA) 
+# call the basemap, also: extent="panel",fullpage=TRUE
+#gg
+
+# TEST PLOT (SIMPLE)
+# ggCA <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==1984,], 
+#                         aes(x=longitude, y=latitude, size=snow_cm),
+#                         show.legend=T, pch=21, color="gray30",
+#                         fill="blue2", alpha=0.6)+
+#   theme_bw() + facet_wrap(~Year, ncol=1)
+# print(ggCA) 
 
 # WITH PALETTE
-ggSnw <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==2013,], 
+ggSnw <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==1998,], 
                         aes(x=longitude, y=latitude,size=snow_cm*1.2, fill=snow_cm),
                         show.legend=F, pch=21)+ 
   theme_bw() + ylab("Latitude") + xlab("Longitude") +
   theme(legend.position=c(1,1),legend.justification=c(1,1),
         legend.direction="vertical",legend.text=element_text(size=8),
         legend.title=element_text(size=8, face="bold"),
-        legend.box="horizontal",
+        legend.box="horizontal", panel.background = element_blank(),
         legend.box.just = c("top"), 
         legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
-  scale_fill_gradientn("Snow Depth (cm)",colours=paletteRdBu,
-                       breaks=breaks,values=breaks, rescaler = function(x, ...) x, 
+  scale_fill_gradientn("Snow Depth (cm)",
+                       colours=paletteRdBu,
+                       breaks=breaks,values=breaks, rescaler = function(x, ...) x,
                        oob = identity,limits=range(breaks), space="Lab")+
   facet_wrap(~Year, ncol = 1)
 
@@ -231,12 +234,9 @@ print(ggSnw)
 
 Use a loop to create PNGs.
 
-```{r make a loop, eval=F, echo=T}
+```{r cdec loop, eval=F, echo=T}
 
-# i<-2011
-# table(snow.hgm.df$Year)
-
-for (i in c(1930:max(snow.hgm.df$Year))){
+for (i in c(1984:max(snow.hgm.df$Year))){
   gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==i,], 
                         aes(x=longitude, y=latitude, size=snow_cm*1.2, fill=snow_cm),
                   show.legend=F, pch=21, color="gray30")+ 
@@ -245,11 +245,11 @@ for (i in c(1930:max(snow.hgm.df$Year))){
           legend.position=c(1,1),legend.justification=c(1,1),
           legend.direction="vertical",legend.text=element_text(size=8),
           legend.title=element_text(size=8, face="bold"),
-          legend.box="horizontal",
+          legend.box="horizontal", panel.background = element_blank(),
           legend.box.just = c("top"), 
           legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
     scale_fill_gradientn("Snow Depth (cm)",
-                         colours=brewer.pal(8,name="RdBu"), 
+                         colours=brewer.pal(9,name="RdBu"),
                          limits=range(breaks), breaks=breaks)+
     # scale_fill_gradientn("Snow Depth (cm)",colours=paletteRdBu,
     #                     breaks=breaks,values=breaks, rescaler = function(x, ...) x,
@@ -257,7 +257,7 @@ for (i in c(1930:max(snow.hgm.df$Year))){
     facet_wrap(~Year, ncol = 1)
     print(paste0("saving plot ", i))
     ggsave(filename = paste0("../fig_output/cdec/hgm_snowcdec_",i,".png"),
-           width = 11,height=8.5,dpi = 150)
+           width=8, height=8, units = "in", dpi=150)
 }
 
 
@@ -296,7 +296,7 @@ cdec_map <- function(Yr){
           legend.position=c(1,1),legend.justification=c(1,1),
           legend.direction="vertical",legend.text=element_text(size=8),
           legend.title=element_text(size=8, face="bold"),
-          legend.box="horizontal",
+          legend.box="horizontal", panel.background = element_blank(),
           legend.box.just = c("top"), 
           legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
     scale_fill_gradientn("Snow Depth (cm)",
@@ -316,16 +316,17 @@ seq(from = 1984, to=2015, by=1) %>%
   map(cdec_map)
 
 # Step 2: List those Plots, Read them in, and then make animation
-list.files(path = "./fig_output/cdec/", pattern = "*.png", full.names = T) %>% 
+list.files(path = "../fig_output/cdec/", pattern = "*.png", full.names = T) %>% 
   map(image_read) %>% # reads each path file
   image_join() %>% # joins image
-  image_animate(fps=4) %>% # animates, can opt for number of loops
-  image_write("./fig_output/cdec_snow.gif") # write to current dir
+  image_animate(fps=2.5) %>% # animates, can opt for number of loops
+  image_write("../fig_output/cdec_snow.gif") # write to current dir
 
 ```
 
 ```{r ndvi animation}
-mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds") # full model dataset
+
+mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds") # full model dataset
 mod.hgm$month<-lubridate::month(mod.hgm$date)
 ndvi.df <- mod.hgm %>% 
   group_by(UCDID, WY, month) %>% 
@@ -336,7 +337,7 @@ ndvi.df <- mod.hgm %>%
 
 ## Set the NDVI Palette
 breaks<-(c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8)) # for color scale
-palette<-c("darkred","red4","red2","lightcoral","lightpink","limegreen","green2","forestgreen")
+palette<-c("darkred","red4","red2","lightcoral","thistle1","limegreen","green2","forestgreen")
 
 # Get the basemap
 ca <- get_map(
@@ -346,30 +347,31 @@ ca <- get_map(
   scale="auto",color="bw",source="google",
   maptype="terrain") # can change to terrain
 
-gg <- ggmap(ca, extent='device',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
+gg <- ggmap(ca, extent='panel',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
 
 ndvi_map <- function(Yr){
   
   gg + geom_point(data=ndvi.df[ndvi.df$WY==Yr,], 
                         aes(x=LONG_DD, y=LAT_DD, fill=mean),
-                  show.legend=F, pch=21, size=4.4, color="gray30")+ 
+                  show.legend=F, pch=21, size=4.8, color="gray30")+ 
     theme_bw() + ylab("Latitude") + xlab("Longitude") +
     theme(axis.text.x = element_text(angle = 60, vjust=0.15, size=8),
           legend.position=c(1,1),legend.justification=c(1,1),
           legend.direction="vertical",legend.text=element_text(size=8),
           legend.title=element_text(size=8, face="bold"),
-          legend.box="horizontal",
+          legend.box="horizontal", panel.background = element_blank(),
           legend.box.just = c("top"), 
           legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
-    # scale_fill_gradientn("NDVI (Aug)",
-                         # colours=brewer.pal(8,name="RdYlGn"), 
-                         # limits=range(breaks), breaks=breaks)+
+    # scale_fill_viridis(name="NDVI (Aug)", limits=range(breaks), 
+    #                    breaks=breaks, option = "B", direction = -1)+
+    #scale_fill_gradientn("NDVI (Aug)", colours=brewer.pal(8,name="RdYlGn"),
+    #                     limits=range(breaks), breaks=breaks)+
     scale_fill_gradientn("NDVI (Aug)",colours=palette,
                          breaks=breaks,values=breaks, rescaler = function(x, ...) x,
                          oob = identity,limits=range(breaks), space="Lab")+
     facet_wrap(~WY, ncol = 1)
     print(paste0("saving plot ", Yr))
-    ggsave(filename = paste0("./fig_output/ndvi/hgm_ndvi_",Yr,".png"),
+    ggsave(filename = paste0("../fig_output/ndvi/hgm_ndvi_",Yr,".png"),
            width = 8,height=8,dpi = 150)
 }
   
@@ -379,10 +381,10 @@ seq(from = 1984, to=2015, by=1) %>%
 
 
 # Step 2: List those Plots, Read them in, and then make animation
-list.files(path = "./fig_output/ndvi/", pattern = "*.png", full.names = T) %>% 
+list.files(path = "../fig_output/ndvi/", pattern = "*.png", full.names = T) %>% 
   map(image_read) %>% # reads each path file
   image_join() %>% # joins image
-  image_animate(fps=4) %>% # animates, can opt for number of loops
+  image_animate(fps=2) %>% # animates, can opt for number of loops
   image_write("ndvi_aug_hgm.gif") # write to current dir
 
 ```
@@ -390,11 +392,16 @@ list.files(path = "./fig_output/ndvi/", pattern = "*.png", full.names = T) %>%
 ```{r animation w systemImageMagick}
 
 ## Using ImageMagick: Set working dir first to images
-system(command= "convert ~/Documents/github/meadow_hgm_waterchem/fig_output/cdec/*.png -delay 80 -loop 0 cdec_snow_IM.gif")
+system(command= "convert ~/Documents/github/meadow_hgm_waterchem/fig_output/cdec/hgm_snowcdec_v2* -delay 100 -loop 0 cdec_snow_IM.gif")
 # play with -delay as necessary, this is much faster than the fps in "magick"
 
 # To Resize Use
 system(command= "convert -size 1100x850 cdec_snow.gif -resize 800x600 cdec_snow_small.gif")
+system(command= "convert cdec_snow.gif -resize 50% cdec_snow_small.gif")
+
+## TO Slow down use existing Gif
+
+system(command = "convert -delay 40 cdec_snow_v2.gif cdec_snow_v3.gif")
 
 ## Remove pngs if you want to save space
 #file.remove(list.files(pattern=".png"))

@@ -251,7 +251,7 @@ The final GEE dataset merged with Weixelman selected meadows gives us 22 meadows
 
 ```{r final dataset, eval=T, echo=T}
 
-mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
+mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds")
 #names(mod.hgm)
 datatable(head(as.data.frame(mod.hgm)), 
               class="compact row-border stripe",
@@ -365,6 +365,7 @@ cowplot::save_plot("./fig_output/violin_ndvi_ndwi_jun-aug.png", plot = vio_stack
  Here are the same data (MEANS of LANDSAT DATA) with the same groupings using notched boxplots to assess if medians are significantly different. Notches are used to compare groups; if the notches of two boxes do not overlap, this suggests that the medians are significantly different.
 
 ```{r boxplots, eval=F, echo=T}
+mod.hgm$month <- month(mod.hgm$date)
 
 # Boxplots -------
 
@@ -375,18 +376,36 @@ box.ndvi<-ggplot(data=mod.hgm[mod.hgm$index=="NDVI" & mod.hgm$month>=6 & mod.hgm
   geom_boxplot(notch = T) + scale_fill_viridis(discrete = T) + 
   theme_bw() #+ facet_grid(month~.)
 
+box.ndvi8<-ggplot(data=mod.hgm[mod.hgm$index=="NDVI" & mod.hgm$month==8,], 
+       aes(x=PLOT, y=mean, fill=as.factor(hgm_code))) + ylim(c(-0.2,1))+
+  ggtitle("Boxplot of NDVI") + xlab("Meadow Plot") + guides(fill=guide_legend(title="HGM Type")) +
+  geom_boxplot(notch = T, show.legend=F) + scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+box.ndvi8
+
 # make a box plot of NDWI
 box.ndwi<-ggplot(data=mod.hgm[mod.hgm$index=="NDWI" & mod.hgm$month>=6 & mod.hgm$month<9,], 
        aes(x=as.factor(month), y=mean, fill=as.factor(hgm_code))) + ylim(c(-0.2,1))+
-  ggtitle("Boxplot of NDWI") + xlab("Month") + guides(fill=guide_legend(title="HGM Type")) +
-  geom_boxplot(notch = T) + scale_fill_viridis(discrete = T) + 
+  ggtitle("Boxplot of NDWI") + xlab("Month") + #guides(fill=guide_legend(title="HGM Type")) +
+  geom_boxplot(notch = T, show.legend=F) + scale_fill_viridis(discrete = T) + 
   theme_bw() #+ facet_grid(month~.)
 
+# aug only
+box.ndwi8<-ggplot(data=mod.hgm[mod.hgm$index=="NDWI" & mod.hgm$month==8,], 
+       aes(x=PLOT, y=mean, fill=as.factor(hgm_code))) + ylim(c(-0.3,1))+
+  ggtitle("Boxplot of NDWI") + xlab("Meadow Plot") + 
+  guides(fill=guide_legend(title="HGM Type"), ncol=1, nrow=1) +
+  geom_boxplot(notch = T, show.legend = T) + scale_fill_viridis(discrete = T) + 
+  theme_bw() +  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                      legend.position="top")
+box.ndwi8
+
 box_stack<-cowplot::plot_grid(box.ndvi, box.ndwi, align = "v",nrow = 2)
+box_stack2<-cowplot::plot_grid(box.ndvi8, box.ndwi8, align = "v",nrow = 2)
+box_stack2
+cowplot::save_plot("../fig_output/box_ndvi_ndwi_aug.png", plot = box_stack2, ncol = 2,base_aspect_ratio = 0.7, base_height = 6)
 
-box_stack
-
-cowplot::save_plot("./fig_output/box_ndvi_ndwi_jun-aug.png", plot = box_stack, ncol = 2,base_aspect_ratio = 0.7, base_height = 6)
+cowplot::save_plot("../fig_output/box_ndvi_ndwi_jun-aug.png", plot = box_stack, ncol = 2,base_aspect_ratio = 0.7, base_height = 6)
 
 ```
 
@@ -399,6 +418,33 @@ In this case, it's interesting that the NDVI seems to parse HGM types out more s
 Now that we have the data, we can also assess how these data may fluctuate across meadows and water year types. See figures below of Water Year Type and mean NDVI/NDWI for each HGM type. 
 
 It appears there is some signal in the data during summer months, particularly for the `Lacustrine Fringe` and `Riparian` HGM types. The `Discharge Slope` appears to have a very large amount of variation inherently in all months across years (water year types), but model will hopefully help delineate if some of this variation can be explained by HGM types and landsat data.
+
+```{r boxplots of Selected Mdws}
+# Model Datasets
+load("../data_output/model_datasets_Aug_max.rda")
+
+plot.ndvi<-ggplot(data=dfVI,aes(x=as.factor(mdw_id), y=mean, fill=as.factor(hgm_class_comb))) + ylab("Max August NDVI") +
+  ylim(c(-0.2,1))+ ggtitle("Max NDVI") + xlab("Meadow ID") +
+  guides(fill=guide_legend(title="HGM Type")) +
+  #stat_smooth(col="gray70",alpha=0.2) + 
+  geom_boxplot()+ geom_point(pch=21, alpha=0.3) +
+  scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+plot.ndvi
+
+
+plot.ndwi<-ggplot(data=dfWI,aes(x=as.factor(mdw_id), y=mean, fill=as.factor(hgm_class_comb))) + ylab("Max August NDWI") +
+  ylim(c(-0.4,1))+ ggtitle("Max NDWI") + xlab("Meadow ID") +
+  guides(fill=guide_legend(title="HGM Type")) +
+  #stat_smooth(col="gray70",alpha=0.2) + 
+  geom_boxplot()+ geom_point(pch=21, alpha=0.3) +
+  scale_fill_viridis(discrete = T) + 
+  theme_bw() #+ facet_grid(month~.)
+plot.ndwi
+
+
+```
+
 
 ```{r plots by WYT, eval=F, echo=F, fig.height=4, fig.width=5}
 
@@ -997,7 +1043,7 @@ as.data.frame(importance(rfVI.1)) %>%
 #https://arxiv.org/pdf/1501.07196.pdf
 # OK NOW TRY GGRandomForest
 
-load("./data_output/models/rf_models.rda")
+load("../data_output/models/rf_models.rda")
 
 library(randomForest)
 library(ggRandomForests)
@@ -1005,12 +1051,12 @@ library(dplyr)
 
 ## NDWI
 #rfWI.2<-rfsrc(mean ~ ., data=rfWI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
-print(rfWI.2)
+#print(rfWI.2)
 plot(gg_rfsrc(rfWI.2), alpha=.5)
 
 ## NDVI
 #rfVI.2<-rfsrc(mean ~ ., data=rfVI, importance = T, ntree=5000, mtry = 6, nodesize = 5)
-print(rfVI.2)
+#print(rfVI.2)
 plot(gg_rfsrc(rfVI.2), alpha=.5)
 
 ## Look at Minimal Depth, a more quantitave measure of relative importance.
@@ -1022,7 +1068,9 @@ plot(gg_rfsrc(rfVI.2), alpha=.5)
 
 # vertical dashed line indicates max min depth for important vars
 plot(rfWI_md)+ggtitle("NDWI: Quantitative Measure of Importance")
+ggsave(filename = "../fig_output/RF_NDWI_maxDepth_of_var.png",width = 9.6, height = 6, units = "in", dpi = 200)
 plot(rfVI_md)+ggtitle("NDVI: Quantitative Measure of Importance")
+ggsave(filename = "../fig_output/RF_NDVI_maxDepth_of_var.png",width = 9.6, height = 6, units = "in", dpi = 200)
 
 ## Variable Importance:  VIMP
 ## Xv is the difference between prediction error when X is noised up by 
@@ -1033,8 +1081,11 @@ plot(gg_minimal_vimp(rfWI_md))
 
 plot(gg_vimp(rfWI.2, nvar=10)) + ylab("NDWI Variable Importance") #+
   #scale_y_continuous(labels = scales::percent_format(), limits=c(0,1))
+ggsave(filename = "../fig_output/RF_NDWI_maxDep_vs_RI_var.png",width = 9.6, height = 6, units = "in", dpi = 200)
 
-plot(gg_vimp(rfVI.2, nvar = 10))+ ylab("NDVI Variable Importance")
+
+plot(gg_minimal_vimp(rfVI_md))
+ggsave(filename = "../fig_output/RF_NDVI_maxDep_vs_RI_var.png",width = 9.6, height = 6, units = "in", dpi = 200)
 
 
 gg_vi<- gg_variable(rfVI.2)
