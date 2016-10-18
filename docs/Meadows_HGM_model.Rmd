@@ -1002,7 +1002,7 @@ precis( m1a , depth=2,
 ```{r RandomForests, eval=F, echo=T}
 
 # Model Datasets
-load("./data_output/model_datasets_Aug_max.rda")
+load("../data_output/model_datasets_Aug_max.rda")
 
 library(randomForest)
 library(ggRandomForests)
@@ -1045,7 +1045,7 @@ as.data.frame(importance(rfVI.1)) %>%
 
 load("../data_output/models/rf_models.rda")
 
-library(randomForest)
+#library(randomForest)
 library(ggRandomForests)
 library(dplyr)
 
@@ -1079,7 +1079,7 @@ ggsave(filename = "../fig_output/RF_NDVI_maxDepth_of_var.png",width = 9.6, heigh
 # Compare Rankings of VIMP and Min. Depth
 plot(gg_minimal_vimp(rfWI_md))
 
-plot(gg_vimp(rfWI.2, nvar=10)) + ylab("NDWI Variable Importance") #+
+plot(gg_vimp(rfWI.2, nvar=10), fill="red") + ylab("NDWI Variable Importance") #+
   #scale_y_continuous(labels = scales::percent_format(), limits=c(0,1))
 ggsave(filename = "../fig_output/RF_NDWI_maxDep_vs_RI_var.png",width = 9.6, height = 6, units = "in", dpi = 200)
 
