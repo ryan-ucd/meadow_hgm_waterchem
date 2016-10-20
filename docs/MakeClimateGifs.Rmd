@@ -12,8 +12,6 @@ output:
 
 The goal of this is to demonstrate how to take snow or LANDSAT data and loop through to create GIFs of these plots through time.
 
-## First Get Data
-
 ```{r libraries}
 
 library(sharpshootR)  # CDEC.snow.courses, CDECquery, CDECsnowQuery
@@ -24,8 +22,16 @@ library(scales)
 library(cowplot)
 library(stringr)
 library(readr)
+library(RColorBrewer)
+library(purrr)
+library(magick)
+library(googleVis)
+library(ggmap)
+
 
 ```
+
+## First Get Data
 
 ```{r getsnowdata, eval=F, echo=T}
 
@@ -157,8 +163,8 @@ rm(d,CDEC.snow.courses,PointAssign, dfMDW, dfSNW, closestSiteVec, distVec, min.d
 ```{r MakeBasePlot, fig.align="center"}
 
 ## Load Data
-cdec.snow.mdw<-read_rds("../data_output/cdec_snw_mdw_merge.rds")
-snow.dat<-read_rds("../data_output/cdec_snow_hist_all.rds")
+cdec.snow.mdw<-read_rds("./data_output/cdec_snw_mdw_merge.rds")
+snow.dat<-read_rds("./data_output/cdec_snow_hist_all.rds")
 #mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds") # full model dataset
 #load("../data_output/model_datasets_Aug_max.rda")
 
@@ -175,6 +181,11 @@ snow.hgm.df<-inner_join(snow.df, cdec.snow.mdw, by="Station") %>%
   
 summary(snow.hgm.df)
 table(snow.hgm.df$Year) # Nearly every meadow has data....could plot for each Month if necessary
+
+hgm_snw_mdw.df <- filter(snow.hgm.df, Year>1960) # use only data for >19 mdws
+
+save(hgm_snw_mdw.df,file = "./data_output/hgm_snw_mdw_merge.rda")
+
 
 ## Set the SNOW Palettes
 library(RColorBrewer)
@@ -230,9 +241,11 @@ print(ggSnw)
 
 ```
 
-## NOW SIMPLE LOOP!
+## Now A Simple Loop
 
-Use a loop to create PNGs.
+Use a loop to create PNGs. Use CDEC as Example
+
+### CDEC Loop
 
 ```{r cdec loop, eval=F, echo=T}
 
@@ -263,9 +276,11 @@ for (i in c(1984:max(snow.hgm.df$Year))){
 
 ```
 
-## Now Loop + Animate!
+## Now Loop + Animate with Purrr!
 
 This uses the `purrr` package to map over a ggplot function and build pngs. 
+
+### CDEC Animate
 
 ```{r cdec snow animation}
 
@@ -324,14 +339,17 @@ list.files(path = "../fig_output/cdec/", pattern = "*.png", full.names = T) %>%
 
 ```
 
+### NDVI Animate
+
 ```{r ndvi animation}
 
-mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds") # full model dataset
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds") # full model dataset
 mod.hgm$month<-lubridate::month(mod.hgm$date)
 ndvi.df <- mod.hgm %>% 
   group_by(UCDID, WY, month) %>% 
   filter(index=="NDVI", month==8, mean==max(mean, na.rm=T)) %>%
   select(UCDID, WY, month, mean, median, stdDev, hgm_class_comb, LF:Depressional, LAT_DD, LONG_DD)
+
 
 #load("../data_output/model_datasets_Aug_max.rda") # data
 
@@ -388,6 +406,78 @@ list.files(path = "../fig_output/ndvi/", pattern = "*.png", full.names = T) %>%
   image_write("ndvi_aug_hgm.gif") # write to current dir
 
 ```
+
+### NDWI Animate
+
+```{r ndwi animation}
+
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds") # full model dataset
+mod.hgm$month<-lubridate::month(mod.hgm$date)
+
+ndwi.df <- mod.hgm %>% 
+  group_by(UCDID, WY, month) %>% 
+  filter(index=="NDWI", month==8) %>% 
+  filter(mean==max(mean, na.rm=T)) %>%
+  select(UCDID, WY, month, mean, median, stdDev, hgm_class_comb, LF:Depressional, LAT_DD, LONG_DD)
+
+#load("../data_output/model_datasets_Aug_max.rda") # data
+
+## Set the NDVI Palette
+breaks<-(c(0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9)) # for color scale
+palette<-c("darkred","red4","red2","lightcoral","thistle1","limegreen","green2","forestgreen")
+
+# Get the basemap
+ca <- get_map(
+  #location='california',
+  c(lon=-120,lat=38.7),
+  zoom=7,crop=T,
+  scale="auto",color="bw",source="google",
+  maptype="terrain") # can change to terrain
+
+gg <- ggmap(ca, extent='panel',padding=0) # call the basemap, also: extent="panel",fullpage=TRUE
+
+ndwi_map <- function(Yr){
+  
+  gg + geom_point(data=ndwi.df[ndwi.df$WY==Yr,], 
+                        aes(x=LONG_DD, y=LAT_DD, fill=mean),
+                  show.legend=F, pch=21, size=4.8, color="gray30")+ 
+    theme_bw() + ylab("Latitude") + xlab("Longitude") +
+    theme(axis.text.x = element_text(angle = 60, vjust=0.15, size=8),
+          legend.position=c(1,1),legend.justification=c(1,1),
+          legend.direction="vertical",legend.text=element_text(size=8),
+          legend.title=element_text(size=8, face="bold"),
+          legend.box="horizontal", panel.background = element_blank(),
+          legend.box.just = c("top"), 
+          legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
+    scale_fill_viridis(name="NDVI (Aug)", limits=range(breaks), 
+                        breaks=breaks, option = "D", direction = -1)+
+    # scale_fill_gradientn("NDWI (Aug)", colours=brewer.pal(8,name="GnBu"),
+                         # limits=c(-0.4, 1), breaks=seq(-0.4,1,0.2)) +
+    
+    # scale_fill_gradientn("NDVI (Aug)",colours=palette,
+    #                      breaks=breaks,values=breaks, 
+    #                      rescaler = function(x, ...) x,
+    #                      oob = identity,limits=range(breaks), space="Lab") +
+    facet_wrap(~WY, ncol = 1)
+    print(paste0("saving plot ", Yr))
+    ggsave(filename = paste0("./fig_output/ndwi/hgm_ndwi_",Yr,".png"),
+           width = 8,height=8,dpi = 150)
+}
+  
+# Step 1: Make Plots For Year Range 
+seq(from = 1984, to=2015, by=1) %>% 
+  map_df(ndwi_map)
+
+
+# Step 2: List those Plots, Read them in, and then make animation
+list.files(path = "./fig_output/ndwi/", pattern = "*.png", full.names = T) %>% 
+  map(image_read) %>% # reads each path file
+  image_join() %>% # joins image
+  image_animate(fps=2) %>% # animates, can opt for number of loops
+  image_write("ndwi_aug_hgm.gif") # write to current dir
+
+```
+## Or Use System call to ImageMagick
 
 ```{r animation w systemImageMagick}
 

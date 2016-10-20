@@ -251,7 +251,7 @@ The final GEE dataset merged with Weixelman selected meadows gives us 22 meadows
 
 ```{r final dataset, eval=T, echo=T}
 
-mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds")
+mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 #names(mod.hgm)
 datatable(head(as.data.frame(mod.hgm)), 
               class="compact row-border stripe",
@@ -596,11 +596,10 @@ save(dff, dfVI, dfWI, file = "./data_output/model_datasets_Aug_max.rda")
 #mod.hgm<-read_rds(path="./data_output/hgm_gee_mdws_dat.rds")
 
 # Model Datasets
-load("../data_output/model_datasets_Aug_max.rda")
+load("./data_output/model_datasets_Aug_max.rda")
 
 # NDVI
 names(dfVI)
-#summary(dfVI)
 
 dfVI<-as.data.frame(dfVI)
 dfWI<-as.data.frame(dfWI)
@@ -700,7 +699,7 @@ m1a <- map2stan(
     c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
     sigma ~ cauchy(0,2)
   ),
-  data=dlist1, chains = 2, iter=5000, cores=4)
+  data=dlist1, chains = 2, iter=5000, cores=2)
 
 m2a <- map2stan(
   alist(
@@ -712,7 +711,7 @@ m2a <- map2stan(
     c(bwyi, brip, bsub, bds, bdep, blf) ~ dnorm(0,10),
     sigma ~ cauchy(0,2)
   ),
-  data=dlist2, chains = 2, iter=5000, cores=4)
+  data=dlist2, chains = 2, iter=5000, cores=2)
 
 # SAVE THEM
 save(m1a, m2a, file = "../data_output/models/models_1a_2a_revised.rda")
@@ -749,12 +748,14 @@ plot(precis(m2a, depth=2)) # see full results for each meadow
 mtext("Varying effects model (Mdws) NDWI")
 dev.off()
 ```
+
 ![m1a_precis_all](../fig_output/m1a_ndvi_precis_all.png)
 
 ![m2a_precis_all](../fig_output/m2a_ndwi_precis_all.png)
+
 ```{r mod1a2a posteriors}
 
-load(file = "../data_output/models/models_1a_2a_revised.rda")
+load(file = "./data_output/models/models_1a_2a_revised.rda")
 compare(m1a, m2a)
 
 png("./fig_output/m1a_m2a_precis_plots_simple.png", width = 10, height = 8, units = "in", res = 200)
@@ -837,7 +838,6 @@ Add different "actor" (so have two variables with changing intercepts). See page
 
 Using Meadow ID and HGM category as the intercepts across each HGM type (as a scaled/centered proportion).
 
-
 ```{r mod_all_dat_hgm_m1b, eval=F, echo=T}
 
 m1b <- map2stan(
@@ -906,58 +906,63 @@ mtext("NDWI")
 
 ```
 
-Adding HGM class (type) as an additional intercept improves the model only marginally. It only techically adds a half parameter and improves the WAIC value by 0.4 or 0.6. Can't compare the NDVI and NDWI models at this point because they have slightly different numbers of observations. Should even the two so I can compare in the future.  
+Adding HGM class (type) as an additional intercept improves the model only marginally. It only techically adds a half parameter and improves the WAIC value by 0.4 or 0.6. 
+
+### Model WYI vs. HGM Types
+
+First need to add the snow data to the mix.
+
+```{r add snow}
+
+load(file = "./data_output/hgm_snw_mdw_merge.rda")
+
+# merge with dff existing model set
+
+dff2<-inner_join(dff, hgm_snw_mdw.df, by=c("UCDID"="UCDID","WY"="Year"))
+dff2<-select(dff2,-PLOT.y, -HUC12.y) %>% dplyr::rename(PLOT = PLOT.x, HUC12=HUC12.x)
+
+df2.VI <- dff2 %>% filter(index=="NDVI")
+df2.WI <- dff2 %>% filter(index=="NDWI")
+
+ggplot() + geom_line(data=df2.VI, aes(x=WY, y=snow_cm, color=PLOT))
+
+dlist3 <- list(
+  ndvi=df2.VI$mean,
+  mdwID=df2.VI$mdw_id,
+  WY=coerce_index(df2.VI$WY),
+  snow=(df2.VI$snow_cm-mean(df2.VI$snow_cm))/(sd(df2.VI$snow_cm)),
+  wyi=df2.VI$wyi_s,
+  rip=df2.VI$rip_s,
+  lf=df2.VI$lf_s,
+  sub=df2.VI$sub_s,
+  ds=df2.VI$ds_s,
+  dep=df2.VI$dep_s,
+  hgm=df2.VI$hgm_class_comb, # hgm ID
+  lat=df2.VI$lat_s,
+  kf = df2.VI$kf_s,
+  clay=df2.VI$claytotR_s,
+  catcharea = df2.VI$catch_s,
+  shape=df2.VI$shapearea_s,
+  flowslope=df2.VI$flow_slope_s,
+  elev=df2.VI$elevmean_s
+)
+
+```
 
         
-```{r mod1c2c_WY and mdwVars, eval=F, echo=T} 
+```{r mod3a3b_WYI_vs_HGM, eval=F, echo=T} 
 
-load("./data_output/models/models_1c_2c_revised.rda")
 
-m1c <- map2stan(
+m3a <- map2stan(
   alist(
-    ndvi ~ dnorm(mu, sigma), 
-    mu <- a + a_WY[WY] + bhgm*hgm + bsub*sub + bds*ds +
-      belev*elev + bcatch*catcharea + 
-      bFslope*flowslope + blat*lat + bkf*kf + bclay*clay + bshape*shape,
-    a_WY[WY] ~ dnorm(0, sigma),
+    wyi ~ dnorm(mu, sigma), 
+    mu <- a + bsnow*snow + bsub*sub + 
+      bds*ds + bdep*dep + brip*rip + blf*lf,
     a ~ dnorm(0,10),
-    c(a, belev, bhgm, bsub, bds, bcatch, bFslope, 
-      blat, bkf, bclay, bshape) ~ dnorm(0,10),
+    c(bsnow, bsub, bds, bdep, brip, blf) ~ dnorm(0,10),
     sigma ~ cauchy(0,2)
   ),
-  data=dlist1, chains=2, iter=5000, cores=2)
-
-summary(m1c) # see all 
-plot(m1c) # see trace plots
-par(mfrow=c(1,1))
-precis(m1c, depth=2)
-plot(precis(m1c)) # see basic results with fixed effects
-plot(precis(m1c, depth=2)) # see full results for each meadow
-mtext("Varying effects model m1b")
-
-
-unique(dlist1$WY)
-unique(dfVI$WY)
-
-#save(m1c, file = "../data_output/models/models_1c_revised.rda")
-#load("../data_output/models/models_1c_revised.rda")
-
-m1d <- map2stan(
-  alist(
-    ndvi ~ dnorm(mu, sigma), 
-    mu <- a + a_mdwID[mdwID] + bwyi*wyi + bsub*sub + bds*ds + 
-      belev*elev + bcatch*catcharea + bFslope*flowslope + blat*lat + 
-      bkf*kf + bclay*clay + bshape*shape,
-    a ~ dnorm(0,10),
-    a_mdwID[mdwID] ~ dnorm(11,sigma),
-    c(bwyi, bsub, bds, belev, bcatch, 
-      bFslope, blat, bkf, bclay, bshape) ~ dnorm(0,10),
-    sigma ~ cauchy(0,2)
-  ),
-  data=dlist1, chains = 2, iter=5000, cores=2)
-
-
-save(m1c,m2c, file = "../data_output/models_1c_2c_revised.rda")
+  data=dlist3, chains = 2, iter=5000, cores=2)
 
 summary(m1d) # see all 
 plot(m1d) # see trace plots
@@ -995,7 +1000,6 @@ precis( m1a , depth=2,
 
 
 ```
-
 
 # RandomForests Models
 
