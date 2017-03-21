@@ -15,18 +15,18 @@ The goal of this is to demonstrate how to take snow or LANDSAT data and loop thr
 ```{r libraries}
 
 library(sharpshootR)  # CDEC.snow.courses, CDECquery, CDECsnowQuery
-library(ggplot2)
-library(dplyr)
+library(ggplot2, warn.conflicts = F)
+library(dplyr, warn.conflicts = F)
 library(viridis)
 library(scales)
 library(cowplot)
-library(stringr)
-library(readr)
-library(RColorBrewer)
-library(purrr)
-library(magick)
-library(googleVis)
-library(ggmap)
+library(stringr, warn.conflicts = F)
+library(readr, warn.conflicts = F)
+library(RColorBrewer, warn.conflicts = F)
+library(purrr, warn.conflicts = F)
+library(magick, warn.conflicts = F)
+library(googleVis, warn.conflicts = F, quietly = T)
+library(ggmap, warn.conflicts = F)
 
 
 ```
@@ -163,8 +163,8 @@ rm(d,CDEC.snow.courses,PointAssign, dfMDW, dfSNW, closestSiteVec, distVec, min.d
 ```{r MakeBasePlot, fig.align="center"}
 
 ## Load Data
-cdec.snow.mdw<-read_rds("./data_output/cdec_snw_mdw_merge.rds")
-snow.dat<-read_rds("./data_output/cdec_snow_hist_all.rds")
+cdec.snow.mdw<-read_rds("../data_output/cdec_snw_mdw_merge.rds")
+snow.dat<-read_rds("../data_output/cdec_snow_hist_all.rds")
 #mod.hgm<-read_rds(path="../data_output/hgm_gee_mdws_dat.rds") # full model dataset
 #load("../data_output/model_datasets_Aug_max.rda")
 
@@ -184,7 +184,7 @@ table(snow.hgm.df$Year) # Nearly every meadow has data....could plot for each Mo
 
 hgm_snw_mdw.df <- filter(snow.hgm.df, Year>1960) # use only data for >19 mdws
 
-save(hgm_snw_mdw.df,file = "./data_output/hgm_snw_mdw_merge.rda")
+#save(hgm_snw_mdw.df,file = "./data_output/hgm_snw_mdw_merge.rda")
 
 
 ## Set the SNOW Palettes
@@ -221,21 +221,23 @@ gg <- ggmap(ca, extent='panel',padding=0)
 # print(ggCA) 
 
 # WITH PALETTE
-ggSnw <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year==1998,], 
+ggSnw <- gg + geom_point(data=snow.hgm.df[snow.hgm.df$Year>=2000,], 
                         aes(x=longitude, y=latitude,size=snow_cm*1.2, fill=snow_cm),
                         show.legend=F, pch=21)+ 
   theme_bw() + ylab("Latitude") + xlab("Longitude") +
   theme(legend.position=c(1,1),legend.justification=c(1,1),
         legend.direction="vertical",legend.text=element_text(size=8),
-        legend.title=element_text(size=8, face="bold"),
+        legend.title=element_text(size=24, face="bold"),
         legend.box="horizontal", panel.background = element_blank(),
+        strip.text.x = element_text(size = 18),
         legend.box.just = c("top"), 
         legend.background = element_rect(fill=alpha('white', 0.6), colour = "gray30")) +
   scale_fill_gradientn("Snow Depth (cm)",
                        colours=paletteRdBu,
                        breaks=breaks,values=breaks, rescaler = function(x, ...) x,
                        oob = identity,limits=range(breaks), space="Lab")+
-  facet_wrap(~Year, ncol = 1)
+  facet_wrap(~Year, ncol = 4)
+ggSnw
 
 print(ggSnw)
 
