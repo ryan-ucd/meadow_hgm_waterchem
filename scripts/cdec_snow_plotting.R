@@ -34,7 +34,7 @@ library(stringr)
 
 # LOAD RDATA --------------------------------------------------------------
 
-load("./data/processed/cdec_snow_historical_all.RData")
+load("./data_output/cdec_snow_historical_all.RData")
 
 library(dplyr)
 # filter to single measurement type
@@ -73,7 +73,7 @@ gg <- ggmap(ca, extent='device',padding=0) # call the basemap, also: extent="pan
 # PLOT SIMPLE
 ggCA <- gg + geom_point(data=dfsnw1[dfsnw1$Year==1984,], 
                         aes(x=longitude, y=latitude, size=snow_cm),
-                        show_guide=T, pch=21, color="gray30",
+                        show.legend=T, pch=21, color="gray30",
                         fill="blue2", alpha=0.6)+
   theme_bw() + facet_wrap(~Year, ncol=1)
 print(ggCA) 
@@ -99,20 +99,23 @@ ggSnw
 # LOOP IT! ----------------------------------------------------------------
 # i<-2011
 
-table(dfsnw1$Year,dfsnw1$Month)
+table(dfsnw1$Year)
 j=4
-for (i in c(1957:1979)){
+
+for (i in c(1984:1994)){
   # for (j in c(2:4)){
     
-    gg + geom_point(data=dfsnw1[dfsnw1$Year==i & dfsnw1$Month==4,], 
-                    aes(x=longitude, y=latitude, fill=Snow, size=Snow),
-                    show_guide=F, pch=21,color="gray30")+ theme_bw()+
+    gg + geom_point(data=dfsnw1[dfsnw1$Year==i,], 
+                    aes(x=longitude, y=latitude, fill=snow_cm, size=snow_cm),
+                    show.legend = F, pch=21,color="gray30")+ theme_bw()+
       #ggtitle(paste0("Meadows (Sac. Hydro. Unit: DWR): Max NDVI - ", i))+
       theme(axis.text.x = element_text(angle = 60, vjust=0.15, size=9))+
-      facet_wrap(~Year+Month, ncol=1)+
+      #facet_wrap(.~Year, ncol=1) +
       scale_fill_gradientn("Snow Depth",colours=brewer.pal(8,name="RdBu"),breaks=breaks)
-    print(paste0("saving plot ", i, "-",j))
-    ggsave(filename = paste0("./docs/looped/hgm_snow_cdec/hgm_snowcdec_",i,"-",j,"_full.png"),width = 11,height=8.5,dpi = 150)
+    
+  
+  print(paste0("saving plot ", i, "-Apr"))
+    ggsave(filename = paste0("./docs/looped/hgm_snowcdec_",i,"_full.png"),width = 11,height=8.5,dpi = 150)
   # }
 }
 

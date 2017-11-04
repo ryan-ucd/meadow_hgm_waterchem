@@ -3,7 +3,8 @@
 ## See template used here: http://shiny.snap.uaf.edu/cc4liteFinal/ 
 # LOAD PACKAGES -----------------------------------------------------------
 
-lapply(list("shiny", "shinythemes", "shinyBS", "rCharts", "plyr", 
+lapply(list("shiny", "shinythemes", "shinyBS",
+            #"plyr", 
             "leaflet", "htmltools", "magrittr", "ggplot2", "dygraphs", 
             "xts", "maps", "sp", "rgdal", "scales", "geojsonio"), 
        function(x) library(x, character.only=T))
@@ -29,7 +30,7 @@ sites <- sort(unique(mdws$ID))
 # dwr<-spTransform(dwr, CRS("+proj=longlat +datum=WGS84"))
 
 ## READING IN GEOJSON using 'rgdal: readOGR'
-dwr<-readOGR(dsn = "DWR_hydro.geojson", "OGRGeoJSON") # reads in as SP.poly
+# dwr<-readOGR(dsn = "data/DWR_HydrologicRegions-utm11.shp",layer="DWR_HydrologicRegions-utm11") # reads in as SP.poly
 
 ## READING IN GEOJSON using 'geojsonio: geojson_read'
 mdwJSON <- geojson_read("SNMMPC.geojson", what="sp") # reads as Spatial Polygons Dataframe
@@ -50,9 +51,9 @@ mdwJSON <- geojson_read("SNMMPC.geojson", what="sp") # reads as Spatial Polygons
 
 
 # rCharts -----------------------------------------------------------------
-# 
-# require(rCharts)
-# require(dplyr)
+#devtools::install_github('ramnathv/rCharts')
+# library(rCharts)
+# library(dplyr)
 # dat<-filter(mdws, ID=="UCDSNM000008", wtyr>=2000)
 # dat$dates<-as.character(dat$date)
 # 

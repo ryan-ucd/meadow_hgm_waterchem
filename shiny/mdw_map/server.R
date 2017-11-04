@@ -17,38 +17,40 @@ shinyServer(function(input, output, session){
   
   output$Map <- renderLeaflet({
     
-    leaflet() %>% addTiles(group = "OSM") %>% 
+    leaflet() %>% 
+      addProviderTiles("Esri.WorldTopoMap", group = "Topo") %>%
       addProviderTiles("Esri.WorldImagery", group="Aerial") %>%
-      addProviderTiles("Stamen.TopOSMFeatures", group = "TopOSM Features") %>%
+      addProviderTiles("Stamen.TopOSMFeatures", group = "Topo Features") %>%
+      hideGroup(group = "Topo Features") %>% 
       setView(lng=-120, lat=39, zoom=5) %>%
       
-      #addProviderTiles("CartoDB.Positron", group="Carto") %>% 
-      #addProviderTiles("Stamen.Toner", group = "Toner") %>%
-      #addProviderTiles("OpenTopoMap", group = "Open Topo") %>%
-      
-      addCircleMarkers(data=xydat, group="Mdws", radius = 4, color = "black", fill = T, stroke=F, fillColor = "forestgreen", 
-                       fillOpacity=0.8, layerId = ~ID, popup=htmlEscape(paste0("ID:" , xydat$ID))) %>% 
+    
+      addCircleMarkers(data=xydat, group="Meadows", radius = 4, 
+                       color = "black", fill = T, stroke=F, 
+                       fillColor = "forestgreen", 
+                       fillOpacity=0.8, layerId = ~ID, 
+                       popup=htmlEscape(paste0("ID:" , xydat$ID)),
+                       clusterOptions = markerClusterOptions(),
+                       clusterId = "MdwsCluster") %>% 
       
       # add the DWR Hydro Regions
-      addPolygons(data = dwr, group = "DWR Hydrologic Regions", fill=FALSE, weight = 3,stroke = TRUE,
-                  opacity = 0.3, color = "blue",
-                  popup=htmlEscape(dwr@data$HR_NAME)) %>%
+      # addPolygons(data = dwr, group = "DWR Hydrologic Regions", 
+      #             fill=FALSE, weight = 3,stroke = TRUE,
+      #             opacity = 0.3, color = "blue",
+      #             popup=htmlEscape(dwr@data$HR_NAME)) %>%
       
-      # add the Meadow Polygons
-      addPolygons(data=mdwJSON, group="Mdw Polys", weight=4, fill=T, color="yellow", fillColor="yellow2", fillOpacity=0.4,
-                  opacity=0.3, popup=paste0(mdwJSON@data$ID, "<br>","Elev_mean (m): ", mdwJSON@data$ELEV_MEAN, "<br>",
-                                            "Dom. Rock Type: ", mdwJSON@data$DOM_ROCKTY)) %>% 
+      # # add the Meadow Polygons
+      # addPolygons(data=mdwJSON, group="Mdw Polys", weight=4, fill=T, color="yellow", fillColor="yellow2", fillOpacity=0.4,
+      #             opacity=0.3, popup=paste0(mdwJSON@data$ID, "<br>","Elev_mean (m): ", mdwJSON@data$ELEV_MEAN, "<br>",
+      #                                       "Dom. Rock Type: ", mdwJSON@data$DOM_ROCKTY)) %>% 
       
       #addPolygons(data=mdwInput(), weight=4, opacity=0.5, color="yellow", fill=FALSE, group = "MdwPolygons") %>% 
       
       addLayersControl(
-        baseGroups = c("OSM","Aerial"),
-        overlayGroups = c("DWR Hydrologic Regions", "TopOSM Features", "Mdws", "Mdw Polys"),
-        options = layersControlOptions(collapsed = T)) %>% 
-      hideGroup("Mdw Polys")
+        baseGroups = c("Topo","Aerial"),
+        overlayGroups = c("Topo Features", "Meadows"),
+        options = layersControlOptions(collapsed = T))
   })
-  
-      
   
   observeEvent(input$Map_marker_click, {
     p <- input$Map_marker_click

@@ -40,7 +40,7 @@ shinyUI(navbarPage(
                                                  <p style="text-align:justify">There about over 17,000 meadows mapped in this app (using SNMMC_v1 data).
                                                  Because pixel size for LANDSAT imagery is 30 meters, meadows < 1.5 hectares were filtered out to reduce inaccurate and noisy data. </p>
 
-                                                 <p style="text-align:justify">For more information about the Meadows dataset and the UCD Meadows Clearinghouse, please read the information found on the <code>About</code> tab at 
+                                                 <p style="text-align:justify">For more information about the Meadows dataset and the <a href="http://meadows.ucdavis.edu" target="">UCD Meadows Clearinghouse</a>, please read the information found on the <code>About</code> tab at 
                                                  the top of the page for links.</p>'
                            )),
                    
